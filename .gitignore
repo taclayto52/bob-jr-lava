@@ -1,6 +1,7 @@
 .gradle
 .idea/
 src/main/resources/**
+!src/main/resources/readme.txt
 **/build/
 !src/**/build/
 
