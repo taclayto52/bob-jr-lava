@@ -19,17 +19,17 @@ import org.w3c.dom.Text;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 public class BobJr {
 
     private static final Map<String, Command> commands = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(BobJr.class);
 
+    private static Random random;
+    private static File[] soundDirContents;
     private static String botName;
     private static String botNickName;
     private static MakeTheBotLeave makeTheBotLeave;
@@ -39,6 +39,8 @@ public class BobJr {
                 .getChannel()
                 .flatMap(channel -> channel.createMessage("Pong!"))
                 .then());
+
+        random = new Random();
     }
 
     public static void main(String[] args) {
@@ -48,6 +50,9 @@ public class BobJr {
     public BobJr(String token) {
         // setup GCloud text to speech
         TextToSpeech tts = setupTextToSpeech();
+
+        // setup sound directory
+        soundDirContents = new File(this.getClass().getClassLoader().getResource("fart").getFile()).listFiles();
 
         // setup client
         final GatewayDiscordClient client = DiscordClientBuilder.create(token).build()
@@ -127,15 +132,14 @@ public class BobJr {
                 .then());
 
         // fart
-//        commands.put("fart", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
-//                .flatMap(Member::getVoiceState)
-//                .flatMap(VoiceState::getChannel)
-//                .flatMap(channel -> channel.join(spec -> spec.setProvider(provider)))
-//                .doOnSuccess(connection -> {
-//                    this.getClass().getClassLoader().getResource("fart").
-//                    playerManager.loadItem("C:\\Users\\sausa\\OneDrive\\Documents\\GitHub\\bob-jr\\src\\main\\resources\\music.opus", scheduler);
-//                })
-//                .then());
+        commands.put("fart", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
+                .flatMap(Member::getVoiceState)
+                .flatMap(VoiceState::getChannel)
+                .flatMap(channel -> channel.join(spec -> spec.setProvider(provider)))
+                .doOnSuccess(connection -> {
+                    playerManager.loadItem(soundDirContents[random.nextInt(soundDirContents.length)].getAbsolutePath(), scheduler);
+                })
+                .then());
 
         // sound
         commands.put("sound", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
