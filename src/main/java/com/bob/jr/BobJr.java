@@ -11,11 +11,10 @@ import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.message.MessageCreateEvent;
 import discord4j.core.object.VoiceState;
 import discord4j.core.object.entity.Member;
-import discord4j.discordjson.json.gateway.MessageCreate;
+import discord4j.core.object.entity.Message;
 import discord4j.voice.AudioProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.Text;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -58,14 +57,13 @@ public class BobJr {
         final GatewayDiscordClient client = DiscordClientBuilder.create(token).build()
                 .login()
                 .block();
-        makeTheBotLeave = new MakeTheBotLeave(client);
         botName = client.getSelf().block().getMention();
         StringBuffer nickNameBuffer = new StringBuffer(botName);
         int indexOfAt = nickNameBuffer.indexOf("@");
         botNickName = nickNameBuffer.replace(indexOfAt, indexOfAt+1, "@!").toString();
 
         // setup commands
-        setupPlayerAndCommands(tts);
+        setupPlayerAndCommands(tts, client);
 
         // register events
         client.getEventDispatcher().on(MessageCreateEvent.class)
@@ -92,7 +90,7 @@ public class BobJr {
         return tts;
     }
 
-    public void setupPlayerAndCommands(TextToSpeech tts) {
+    public void setupPlayerAndCommands(TextToSpeech tts, GatewayDiscordClient client) {
         // setup audio player
         final AudioPlayerManager playerManager = new DefaultAudioPlayerManager();
         playerManager.getConfiguration().setFrameBufferFactory(NonAllocatingAudioFrameBuffer::new);
@@ -104,6 +102,9 @@ public class BobJr {
 
         AudioProvider provider = new LavaPlayerAudioProvider(player);
 
+        // setup MAKE THE BOT LEAVE command
+        makeTheBotLeave = new MakeTheBotLeave(client, player);
+
         // register provider
         commands.put("join", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
                 .flatMap(Member::getVoiceState)
@@ -112,15 +113,20 @@ public class BobJr {
                 .then());
 
         // just stop for god sakes
-        commands.put("stop", makeTheBotLeave);
+        commands.put("stop", intent -> Mono.justOrEmpty(player)
+                .doOnNext(thePlayer -> thePlayer.getPlayingTrack().stop())
+                .then());
         commands.put("quit", makeTheBotLeave);
         commands.put("leave", makeTheBotLeave);
 
         // create scheduler
         final TrackScheduler scheduler = new TrackScheduler(player);
-        commands.put("play", intent -> Mono.justOrEmpty(intent.getIntentContext())
-//                .map(content -> Arrays.asList(content.split(" ")))
-                .doOnNext(command -> playerManager.loadItem(command, scheduler))
+        commands.put("play", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
+                .flatMap(Member::getVoiceState)
+                .flatMap(VoiceState::getChannel)
+                .flatMap(channel -> channel.join(spec -> spec.setProvider(provider)))
+                .doOnSuccess(voided -> playerManager.loadItem(intent.getIntentContext(), scheduler))
+//                .doOnNext(command -> playerManager.loadItem(command, scheduler))
                 .then());
 
         // rick
@@ -149,13 +155,55 @@ public class BobJr {
                 .doOnSuccess(connection -> playerManager.loadItem("C:\\Users\\sausa\\OneDrive\\Documents\\GitHub\\bob-jr\\src\\main\\resources\\music.opus", scheduler))
                 .then());
 
+        // get voices
+        commands.put("voices", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
+                .flatMap(Message::getChannel)
+                .flatMap(channel -> channel.createMessage(tts.getListOfVoices(intent.getIntentContext())))
+                .then());
+
+        commands.put("myvoice-all", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
+                .flatMap(Message::getChannel)
+                .flatMap(channel -> {
+                    Optional<Member> member = intent.getMessageCreateEvent().getMember();
+                    String returnMessage;
+                    if(intent.getIntentContext() != null) {
+                        String[] voiceParams = intent.getIntentContext().split(" ");
+                        String gender = voiceParams.length >= 1 ? voiceParams[0] : null;
+                        String voiceName = voiceParams.length >= 2 ? voiceParams[1] : null;
+                        Double pitch = voiceParams.length >= 3 ? Double.valueOf(voiceParams[2]) : null;
+                        Double speakingRate = voiceParams.length >= 4 ? Double.valueOf(voiceParams[3]) : null;
+                        returnMessage = tts.setMemberVoiceConfig(member.get(), gender, voiceName, pitch, speakingRate).toString();
+                    } else {
+                        returnMessage = tts.getMemberVoiceString(member.get());
+                    }
+                    return channel.createMessage(returnMessage);
+                })
+                .then());
+
+        commands.put("myvoice", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
+                .flatMap(Message::getChannel)
+                .flatMap(channel -> {
+                    Optional<Member> member = intent.getMessageCreateEvent().getMember();
+                    String returnMessage;
+                    if(intent.getIntentContext() != null) {
+                        returnMessage = tts.setMemberVoiceConfig(member.get(), null, intent.getIntentContext().trim(), null, null).toString();
+                    } else {
+                        returnMessage = String.format(":hear_no_evil: No voice provided! To see list of voices try `@BobJr voices`");
+                    }
+                    return channel.createMessage(returnMessage);
+                })
+                .then());
+
+
         // tts
         commands.put("tts", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
-                .flatMap(Member::getVoiceState)
-                .flatMap(VoiceState::getChannel)
-                .flatMap(channel -> channel.join(spec -> spec.setProvider(provider)))
-                .flatMap(connection -> tts.synthesisTextMono(intent.getIntentContext()))
-                .doOnSuccess(fileLocation -> playerManager.loadItem(fileLocation, scheduler))
+                .flatMap(member -> Mono.just(member)
+                    .flatMap(Member::getVoiceState)
+                    .flatMap(VoiceState::getChannel)
+                    .flatMap(channel -> channel.join(spec -> spec.setProvider(provider)))
+                    .flatMap(connection -> tts.synthesisTextMono(member, intent.getIntentContext()))
+                    .doOnSuccess(fileLocation -> playerManager.loadItem(fileLocation, scheduler))
+                    .then())
                 .then());
     }
 
@@ -182,7 +230,7 @@ public class BobJr {
         String intentContext;
         if(firstSpace > -1) {
             intentName = trimmedMessage.substring(0, firstSpace).toLowerCase(Locale.ENGLISH);
-            intentContext = trimmedMessage.substring(firstSpace + 1).toLowerCase(Locale.ENGLISH);
+            intentContext = trimmedMessage.substring(firstSpace + 1);
         } else {
             // no context provided, just intent name
             intentName = trimmedMessage;

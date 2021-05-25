@@ -1,28 +1,42 @@
 package com.bob.jr;
 
 import com.bob.jr.interfaces.Command;
+import com.google.cloud.texttospeech.v1.Voice;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import discord4j.common.util.Snowflake;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.object.VoiceState;
+import discord4j.core.object.entity.channel.VoiceChannel;
 import reactor.core.publisher.Mono;
+
+import javax.swing.text.html.Option;
+import java.util.Optional;
 
 public class MakeTheBotLeave implements Command {
     private final GatewayDiscordClient client;
+    private final AudioPlayer player;
 
-    public MakeTheBotLeave (GatewayDiscordClient client) {
+    public MakeTheBotLeave (GatewayDiscordClient client, AudioPlayer player) {
         this.client = client;
+        this.player = player;
     }
 
     @Override
     public Mono<Void> execute(Intent intent) {
         return Mono.justOrEmpty(intent.getMessageCreateEvent())
                 .flatMap(event -> {
+                    Optional.ofNullable(player.getPlayingTrack()).ifPresent(audioTrack -> audioTrack.stop());
+
                     Snowflake guildSnow = event.getGuild().block().getId();
-                    VoiceState voiceState = client.getMemberById(guildSnow, client.getSelfId())
+                    Optional<VoiceState> voiceStateOptional = Optional.ofNullable(client.getMemberById(guildSnow, client.getSelfId())
                             .block()
                             .getVoiceState()
-                            .block();
-                    return voiceState.getChannel().block().getVoiceConnection().block().disconnect();
+                            .block());
+                    Optional<VoiceChannel> optionalVoiceChannel = voiceStateOptional.stream().findFirst().flatMap(voiceState -> Optional.of(voiceState.getChannel().block()));
+                    optionalVoiceChannel.ifPresent(voiceChannel -> voiceChannel.getVoiceConnection().block().disconnect());
+                    return Mono.empty();
                 })
                 .then();
     }
