@@ -17,17 +17,19 @@ import java.util.Optional;
 public class MakeTheBotLeave implements Command {
     private final GatewayDiscordClient client;
     private final AudioPlayer player;
+    private final TrackScheduler scheduler;
 
-    public MakeTheBotLeave (GatewayDiscordClient client, AudioPlayer player) {
+    public MakeTheBotLeave (GatewayDiscordClient client, AudioPlayer player, TrackScheduler scheduler) {
         this.client = client;
         this.player = player;
+        this.scheduler = scheduler;
     }
 
     @Override
     public Mono<Void> execute(Intent intent) {
         return Mono.justOrEmpty(intent.getMessageCreateEvent())
                 .flatMap(event -> {
-                    Optional.ofNullable(player.getPlayingTrack()).ifPresent(audioTrack -> audioTrack.stop());
+                    scheduler.clearPlaylist();
 
                     Snowflake guildSnow = event.getGuild().block().getId();
                     Optional<VoiceState> voiceStateOptional = Optional.ofNullable(client.getMemberById(guildSnow, client.getSelfId())
@@ -35,7 +37,9 @@ public class MakeTheBotLeave implements Command {
                             .getVoiceState()
                             .block());
                     Optional<VoiceChannel> optionalVoiceChannel = voiceStateOptional.stream().findFirst().flatMap(voiceState -> Optional.of(voiceState.getChannel().block()));
-                    optionalVoiceChannel.ifPresent(voiceChannel -> voiceChannel.getVoiceConnection().block().disconnect());
+                    optionalVoiceChannel.ifPresent(voiceChannel ->{
+                        voiceChannel.getVoiceConnection().block().disconnect().block();
+                    });
                     return Mono.empty();
                 })
                 .then();

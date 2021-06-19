@@ -1,10 +1,13 @@
 package com.bob.jr;
 
 import com.bob.jr.interfaces.Command;
+import com.bob.jr.utils.LimitsHelper;
+import com.bob.jr.utils.RegexHelper;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import com.sedmelluq.discord.lavaplayer.track.playback.NonAllocatingAudioFrameBuffer;
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
@@ -102,8 +105,11 @@ public class BobJr {
 
         AudioProvider provider = new LavaPlayerAudioProvider(player);
 
+        // create scheduler
+        final TrackScheduler scheduler = new TrackScheduler(player);
+
         // setup MAKE THE BOT LEAVE command
-        makeTheBotLeave = new MakeTheBotLeave(client, player);
+        makeTheBotLeave = new MakeTheBotLeave(client, player, scheduler);
 
         // register provider
         commands.put("join", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
@@ -112,21 +118,39 @@ public class BobJr {
                 .flatMap(channel -> channel.join(spec -> spec.setProvider(provider)))
                 .then());
 
-        // just stop for god sakes
-        commands.put("stop", intent -> Mono.justOrEmpty(player)
-                .doOnNext(thePlayer -> thePlayer.getPlayingTrack().stop())
-                .then());
-        commands.put("quit", makeTheBotLeave);
-        commands.put("leave", makeTheBotLeave);
-
-        // create scheduler
-        final TrackScheduler scheduler = new TrackScheduler(player);
         commands.put("play", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
                 .flatMap(Member::getVoiceState)
                 .flatMap(VoiceState::getChannel)
                 .flatMap(channel -> channel.join(spec -> spec.setProvider(provider)))
                 .doOnSuccess(voided -> playerManager.loadItem(intent.getIntentContext(), scheduler))
 //                .doOnNext(command -> playerManager.loadItem(command, scheduler))
+                .then());
+
+        commands.put("search", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
+                .flatMap(Member::getVoiceState)
+                .flatMap(VoiceState::getChannel)
+                .flatMap(channel -> channel.join(spec -> spec.setProvider(provider)))
+                .doOnSuccess(voided -> playerManager.loadItem(String.format("ytsearch:%s", intent.getIntentContext()), scheduler))
+                .then());
+
+        commands.put("playlist", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
+                .flatMap(Message::getChannel)
+                .flatMap(messageChannel -> {
+                    List<AudioTrack> audioTrackList = scheduler.getAudioTracks();
+                    StringBuilder printString = new StringBuilder();
+                    if(audioTrackList.isEmpty() && Optional.ofNullable(player.getPlayingTrack()).isEmpty()) {
+                        printString.append(":no_mouth: No playlist currently set");
+                    } else{
+                        if(Optional.ofNullable(player.getPlayingTrack()).isPresent()) {
+                            printString.append(String.format(":loud_sound: **Currently playing:** %s%n", player.getPlayingTrack().getInfo().title));
+                        }
+                        for(int i=0; i<audioTrackList.size(); i++) {
+                            printString.append(String.format("%d: %s%n", i + 1, audioTrackList.get(i).getInfo().title));
+                        }
+                    }
+
+                    return messageChannel.createMessage(printString.toString());
+                })
                 .then());
 
         // rick
@@ -194,6 +218,74 @@ public class BobJr {
                 })
                 .then());
 
+        commands.put("pitch", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
+                .flatMap(Message::getChannel)
+                .flatMap(channel -> {
+                    final String defaultValue = "DEFAULT_VALUE";
+                    Member member = intent.getMessageCreateEvent().getMember().get();
+                    double currentPitch = tts.getMemberVoice(member).getAudioConfig().getPitch();
+                    final String context = Optional.ofNullable(intent.getIntentContext()).orElse(defaultValue);
+                    final StringBuilder stringBuilder = new StringBuilder();
+                    switch (context) {
+                        case "up":
+                            tts.getMemberVoice(member).setPitchInAudioConfigBuilder(Math.min(currentPitch + .5, LimitsHelper.PitchLimits.upperLimit));
+                            break;
+                        case "down":
+                            tts.getMemberVoice(member).setPitchInAudioConfigBuilder(Math.max(currentPitch - .5, LimitsHelper.PitchLimits.lowerLimit));
+                            break;
+                        case defaultValue:
+                            break;
+                        default:
+                            if(context.matches(RegexHelper.POS_NEG_DECIMAL_REGEX)) {
+                                final double doubleValue = Integer.parseInt(context) > 0 ?
+                                        Math.min(Double.parseDouble(context), LimitsHelper.PitchLimits.upperLimit) :
+                                        Math.max(Double.parseDouble(context), LimitsHelper.PitchLimits.lowerLimit);
+                                tts.getMemberVoice(member).setPitchInAudioConfigBuilder(doubleValue);
+                            } else {
+                                stringBuilder.append(String.format(":no_entry_sign: Invalid input provided.%n"));
+                            }
+                    }
+                    tts.getMemberVoice(member).rebuildAudioConfig();
+                    stringBuilder.append(String.format("Current pitch value: %s",
+                            tts.getMemberVoice(member).getAudioConfig().getPitch()));
+                    return channel.createMessage(stringBuilder.toString());
+                })
+                .then());
+
+        commands.put("speaking-rate", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
+                .flatMap(Message::getChannel)
+                .flatMap(channel -> {
+                    final String defaultValue = "DEFAULT_VALUE";
+                    Member member = intent.getMessageCreateEvent().getMember().get();
+                    double currentSpeakingRate = tts.getMemberVoice(member).getAudioConfig().getSpeakingRate();
+                    final String context = Optional.ofNullable(intent.getIntentContext()).orElse(defaultValue);
+                    final StringBuilder stringBuilder = new StringBuilder();
+                    switch (context) {
+                        case "up":
+                            tts.getMemberVoice(member).setSpeakingRateInAudioConfigBuilder(Math.min(currentSpeakingRate + .5, LimitsHelper.SpeakingRateLimits.upperLimit));
+                            break;
+                        case "down":
+                            tts.getMemberVoice(member).setSpeakingRateInAudioConfigBuilder(Math.max(currentSpeakingRate - .5, LimitsHelper.SpeakingRateLimits.lowerLimit));
+                            break;
+                        case defaultValue:
+                            break;
+                        default:
+                            if(context.matches(RegexHelper.POS_DECIMAL_REGEX)) {
+                                final double doubleValue = Integer.parseInt(context) > 0 ?
+                                        Math.min(Double.parseDouble(context), LimitsHelper.SpeakingRateLimits.upperLimit) :
+                                        Math.max(Double.parseDouble(context), LimitsHelper.SpeakingRateLimits.lowerLimit);
+                                tts.getMemberVoice(member).setSpeakingRateInAudioConfigBuilder(doubleValue);
+                            } else {
+                                stringBuilder.append(String.format(":no_entry_sign: Invalid input provided.%n"));
+                            }
+                    }
+                    tts.getMemberVoice(member).rebuildAudioConfig();
+                    stringBuilder.append(String.format("Current speaking rate value: %s",
+                            tts.getMemberVoice(member).getAudioConfig().getSpeakingRate()));
+                    return channel.createMessage(stringBuilder.toString());
+                })
+                .then());
+
 
         // tts
         commands.put("tts", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
@@ -205,6 +297,16 @@ public class BobJr {
                     .doOnSuccess(fileLocation -> playerManager.loadItem(fileLocation, scheduler))
                     .then())
                 .then());
+
+        // just stop for god sakes
+        commands.put("stop", intent -> Mono.justOrEmpty(player)
+                .doOnNext(thePlayer -> {
+//                    thePlayer.stopTrack();
+                    scheduler.clearPlaylist();
+                })
+                .then());
+        commands.put("quit", makeTheBotLeave);
+        commands.put("leave", makeTheBotLeave);
     }
 
     public Intent extractIntent(String incomingMessage, MessageCreateEvent event) {

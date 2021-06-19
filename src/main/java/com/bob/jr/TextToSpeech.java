@@ -92,8 +92,8 @@ public class TextToSpeech {
         MemberVoiceConfig memberVoiceConfig = getMemberVoice(member);
         memberVoiceConfig.setGenderInVoiceSelectionParams(gender);
         memberVoiceConfig.setVoiceNameInVoiceSelectionParams(voiceName);
-        memberVoiceConfig.setPitchInVoiceSelectionParams(pitch);
-        memberVoiceConfig.setSpeakingRateInVoiceSelectionParams(speakingRate);
+        memberVoiceConfig.setPitchInAudioConfigBuilder(pitch);
+        memberVoiceConfig.setSpeakingRateInAudioConfigBuilder(speakingRate);
 
         memberVoiceConfig.rebuildAll();
         return memberVoiceConfig;
@@ -149,12 +149,12 @@ public class TextToSpeech {
             voiceNameOptional.ifPresent(voiceNamePres -> voiceSelectionParamsBuilder.setName(voiceNamePres));
         }
 
-        public void setPitchInVoiceSelectionParams(Double pitch) {
+        public void setPitchInAudioConfigBuilder(Double pitch) {
             Optional<Double> pitchOptional = Optional.ofNullable(pitch);
             pitchOptional.ifPresent(pitchPres -> audioConfigBuilder.setPitch(pitchPres));
         }
 
-        public void setSpeakingRateInVoiceSelectionParams(Double speakingRate) {
+        public void setSpeakingRateInAudioConfigBuilder(Double speakingRate) {
             Optional<Double> speakingRateOptional = Optional.ofNullable(speakingRate);
             speakingRateOptional.ifPresent(speakingRatePres -> audioConfigBuilder.setSpeakingRate(speakingRate));
         }
