@@ -3,6 +3,9 @@ package com.bob.jr;
 import com.bob.jr.interfaces.Command;
 import com.bob.jr.utils.LimitsHelper;
 import com.bob.jr.utils.RegexHelper;
+import com.google.cloud.secretmanager.v1.AccessSecretVersionResponse;
+import com.google.cloud.secretmanager.v1.SecretManagerServiceClient;
+import com.google.cloud.secretmanager.v1.SecretVersionName;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
@@ -36,6 +39,10 @@ public class BobJr {
     private static String botNickName;
     private static MakeTheBotLeave makeTheBotLeave;
 
+    private static final String PROJECT_ID = "937970633558"; // load these from environment var
+    private static final String TOKEN_SECRET_ID = "discord-api-key";
+    private static final String TOKEN_SECRET_VERSION = "1";
+
     static {
         commands.put("ping", intent -> intent.getMessageCreateEvent().getMessage()
                 .getChannel()
@@ -46,18 +53,36 @@ public class BobJr {
     }
 
     public static void main(String[] args) {
-        new BobJr(args[0]);
+        Optional<String> optionalSecret = args.length > 0 ? Optional.ofNullable(args[0]) : Optional.empty();
+        new BobJr(optionalSecret);
     }
 
-    public BobJr(String token) {
+    public BobJr(Optional<String> token) {
         // setup GCloud text to speech
         TextToSpeech tts = setupTextToSpeech();
 
         // setup sound directory
         soundDirContents = new File(this.getClass().getClassLoader().getResource("fart").getFile()).listFiles();
 
+        // try to get secret
+        String secretToken = null;
+        if (!token.isPresent()) {
+            try {
+                SecretManagerServiceClient secretClient = SecretManagerServiceClient.create();
+                final AccessSecretVersionResponse response = secretClient.accessSecretVersion(SecretVersionName.newBuilder()
+                        .setProject(PROJECT_ID)
+                        .setSecret(TOKEN_SECRET_ID)
+                        .setSecretVersion(TOKEN_SECRET_VERSION)
+                        .build());
+                secretToken = response.getPayload().getData().toStringUtf8();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
         // setup client
-        final GatewayDiscordClient client = DiscordClientBuilder.create(token).build()
+        final String tokenProvided = token.orElse(secretToken);
+        final GatewayDiscordClient client = DiscordClientBuilder.create(tokenProvided).build()
                 .login()
                 .block();
         botName = client.getSelf().block().getMention();
