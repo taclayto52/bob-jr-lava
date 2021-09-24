@@ -9,7 +9,6 @@ import reactor.core.publisher.Mono;
 
 import java.io.*;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -42,13 +41,13 @@ public class TextToSpeech {
 
         ByteString audioContents = response.getAudioContent();
 
-        if(response.getAudioContent().isEmpty()) {
+        if (response.getAudioContent().isEmpty()) {
             return this.getClass().getClassLoader().getResource("oom.opus").getFile();
         }
 
         OutputStream out;
         String fileLocation = null;
-        try  {
+        try {
             File file = new File("output.opus");
             fileLocation = file.getPath();
             out = new FileOutputStream(file);
@@ -60,7 +59,7 @@ public class TextToSpeech {
             e.printStackTrace();
         }
 
-        if(fileLocation.isEmpty()) {
+        if (fileLocation.isEmpty()) {
             fileLocation = this.getClass().getClassLoader().getResource("ERROR.opus").getFile();
         }
 

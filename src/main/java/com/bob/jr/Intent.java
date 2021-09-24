@@ -1,8 +1,6 @@
 package com.bob.jr;
 
-import com.google.protobuf.Message;
 import discord4j.core.event.domain.message.MessageCreateEvent;
-import discord4j.discordjson.json.gateway.MessageCreate;
 
 public class Intent {
     private final String intentName;
