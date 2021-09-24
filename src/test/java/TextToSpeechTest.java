@@ -1,6 +1,5 @@
-import com.bob.jr.TextToSpeech;
+import com.bob.jr.TextToSpeech.TextToSpeech;
 import org.junit.jupiter.api.Test;
-import org.w3c.dom.Text;
 
 import java.io.IOException;
 
