@@ -19,7 +19,9 @@ import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.message.MessageCreateEvent;
 import discord4j.core.object.VoiceState;
+import discord4j.core.object.entity.Guild;
 import discord4j.core.object.entity.Member;
+import discord4j.core.object.entity.Role;
 import discord4j.voice.AudioProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,31 +30,25 @@ import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class BobJr {
 
     private static final Map<String, Command> commands = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(BobJr.class);
-
-    private static String botName;
-    private static String botNickName;
-
     private static final Set<VoidCommand> errorMessages = new HashSet<>();
-
     private static final String PROJECT_ID = "937970633558"; // load these from environment var
     private static final String TOKEN_SECRET_ID = "discord-api-key";
     private static final String TOKEN_SECRET_VERSION = "1";
+    private static String botName;
+    private static String botNickName;
+    private static ConcurrentHashMap<Guild, List<Role>> botRoles = new ConcurrentHashMap<>();
 
     static {
         commands.put("ping", intent -> intent.getMessageCreateEvent().getMessage()
                 .getChannel()
                 .flatMap(channel -> channel.createMessage("Pong!"))
                 .then());
-    }
-
-    public static void main(String[] args) {
-        Optional<String> optionalSecret = args.length > 0 ? Optional.ofNullable(args[0]) : Optional.empty();
-        new BobJr(optionalSecret);
     }
 
     public BobJr(Optional<String> token) {
@@ -83,21 +79,43 @@ public class BobJr {
         botName = client.getSelf().block().getMention();
         StringBuffer nickNameBuffer = new StringBuffer(botName);
         int indexOfAt = nickNameBuffer.indexOf("@");
-        botNickName = nickNameBuffer.replace(indexOfAt, indexOfAt+1, "@!").toString();
+        botNickName = nickNameBuffer.replace(indexOfAt, indexOfAt + 1, "@!").toString();
 
         // setup commands
         setupPlayerAndCommands(tts, client);
 
         // register events
         client.getEventDispatcher().on(MessageCreateEvent.class)
+                .flatMap(this::maybeGetGuildRoles)
                 .flatMap(event -> Mono.just(event.getMessage().getContent())
-                        .filter(content -> checkAndReturnBotName(content) != null)
+                        .filter(content -> checkAndReturnBotName(content, event) != null)
                         .map(content -> extractIntent(content, event))
                         .flatMap(this::handleMessageCreateEvent))
                 .subscribe();
 
         // block until disconnect
         client.onDisconnect().block();
+    }
+
+    public static void main(String[] args) {
+        Optional<String> optionalSecret = args.length > 0 ? Optional.ofNullable(args[0]) : Optional.empty();
+        new BobJr(optionalSecret);
+    }
+
+    public static TextToSpeech setupTextToSpeech() {
+        TextToSpeech tts = null;
+        try {
+            tts = new TextToSpeech();
+        } catch (IOException ioe) {
+            logger.error(ioe.getMessage());
+        }
+        return tts;
+    }
+
+    public Mono<MessageCreateEvent> maybeGetGuildRoles(MessageCreateEvent messageCreateEvent) {
+        final var guild = messageCreateEvent.getGuild().block();
+        botRoles.computeIfAbsent(guild, guild1 -> guild1.getSelfMember().block().getRoles().collectList().block());
+        return Mono.just(messageCreateEvent);
     }
 
     public Mono<Void> handleMessageCreateEvent(Intent intent) {
@@ -108,16 +126,6 @@ public class BobJr {
                     throwable.printStackTrace();
                 })
                 .next();
-    }
-
-    public static TextToSpeech setupTextToSpeech() {
-        TextToSpeech tts = null;
-        try{
-            tts = new TextToSpeech();
-        } catch (IOException ioe) {
-            logger.error(ioe.getMessage());
-        }
-        return tts;
     }
 
     public void setupPlayerAndCommands(TextToSpeech tts, GatewayDiscordClient client) {
@@ -170,19 +178,19 @@ public class BobJr {
     }
 
     public Intent extractIntent(String incomingMessage, MessageCreateEvent event) {
-        String containedBotName = checkAndReturnBotName(incomingMessage);
-        if(containedBotName == null) {
+        String containedBotName = checkAndReturnBotName(incomingMessage, event);
+        if (containedBotName == null) {
             return null;
         }
 
         StringBuffer stringBuffer = new StringBuffer(incomingMessage);
         int botNameStartIndex = stringBuffer.indexOf(containedBotName);
 
-        while(botNameStartIndex > -1) {
+        while (botNameStartIndex > -1) {
             int botNameEndIndex = botNameStartIndex + containedBotName.length();
             stringBuffer.replace(botNameStartIndex, botNameEndIndex, "");
 
-            containedBotName = checkAndReturnBotName(incomingMessage);
+            containedBotName = checkAndReturnBotName(incomingMessage, event);
             botNameStartIndex = stringBuffer.indexOf(containedBotName);
         }
 
@@ -190,7 +198,7 @@ public class BobJr {
         int firstSpace = trimmedMessage.indexOf(" ");
         String intentName;
         String intentContext;
-        if(firstSpace > -1) {
+        if (firstSpace > -1) {
             intentName = trimmedMessage.substring(0, firstSpace).toLowerCase(Locale.ENGLISH);
             intentContext = trimmedMessage.substring(firstSpace + 1);
         } else {
@@ -203,12 +211,21 @@ public class BobJr {
         return new Intent(intentName, intentContext, event);
     }
 
-    private String checkAndReturnBotName(String message) {
-        if(message.contains(botName)) {
+    private String checkAndReturnBotName(String message, MessageCreateEvent event) {
+        if (message.contains(botName)) {
             return botName;
         } else if (message.contains(botNickName)) {
             return botNickName;
         } else {
+            final var roleSet = botRoles.get(event.getGuild().block());
+            final var roleSetIterator = roleSet.iterator();
+            while (roleSetIterator.hasNext()) {
+                var role = roleSetIterator.next();
+                if (message.contains(role.getMention())) {
+                    return role.getMention();
+                }
+            }
+
             return null;
         }
     }
