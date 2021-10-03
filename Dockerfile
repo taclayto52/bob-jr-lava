@@ -1,4 +1,4 @@
-FROM debian:stable-20210721
+FROM debian:stable
 
 ARG PROJECT_VERSION
 ADD build/libs/bob-jr-lava-${PROJECT_VERSION}-all.jar /opt/bob-jr/bob-jr-lava-all.jar
