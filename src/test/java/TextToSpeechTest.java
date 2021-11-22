@@ -9,7 +9,7 @@ public class TextToSpeechTest {
     public void verifyTextToSpeech() {
         try {
             TextToSpeech textToSpeech = new TextToSpeech();
-            textToSpeech.synthesisText("ERROR ERROR ERROR!");
+            textToSpeech.synthesizeText("ERROR ERROR ERROR!");
         } catch (IOException e) {
             e.printStackTrace();
         }

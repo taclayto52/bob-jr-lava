@@ -33,7 +33,7 @@ public class VoiceCommands {
                 .flatMap(channel -> {
                     Optional<Member> member = intent.getMessageCreateEvent().getMember();
                     String returnMessage;
-                    if(intent.getIntentContext() != null) {
+                    if (intent.getIntentContext() != null) {
                         String[] voiceParams = intent.getIntentContext().split(" ");
                         String gender = voiceParams.length >= 1 ? voiceParams[0] : null;
                         String voiceName = voiceParams.length >= 2 ? voiceParams[1] : null;
@@ -55,7 +55,7 @@ public class VoiceCommands {
                 .flatMap(channel -> {
                     Optional<Member> member = intent.getMessageCreateEvent().getMember();
                     String returnMessage;
-                    if(intent.getIntentContext() != null) {
+                    if (intent.getIntentContext() != null) {
                         returnMessage = tts.setMemberVoiceConfig(member.get(), null, intent.getIntentContext().trim(), null, null).toString();
                     } else {
                         returnMessage = String.format(":hear_no_evil: No voice provided! To see list of voices try `@BobJr voices`");
@@ -85,7 +85,7 @@ public class VoiceCommands {
                         case defaultValue:
                             break;
                         default:
-                            if(context.matches(RegexHelper.POS_NEG_DECIMAL_REGEX)) {
+                            if (context.matches(RegexHelper.POS_NEG_DECIMAL_REGEX)) {
                                 final double doubleValue = Integer.parseInt(context) > 0 ?
                                         Math.min(Double.parseDouble(context), LimitsHelper.PitchLimits.upperLimit) :
                                         Math.max(Double.parseDouble(context), LimitsHelper.PitchLimits.lowerLimit);
@@ -122,7 +122,7 @@ public class VoiceCommands {
                         case defaultValue:
                             break;
                         default:
-                            if(context.matches(RegexHelper.POS_DECIMAL_REGEX)) {
+                            if (context.matches(RegexHelper.POS_DECIMAL_REGEX)) {
                                 final double doubleValue = Integer.parseInt(context) > 0 ?
                                         Math.min(Double.parseDouble(context), LimitsHelper.SpeakingRateLimits.upperLimit) :
                                         Math.max(Double.parseDouble(context), LimitsHelper.SpeakingRateLimits.lowerLimit);
@@ -146,7 +146,7 @@ public class VoiceCommands {
                         .flatMap(Member::getVoiceState)
                         .flatMap(VoiceState::getChannel)
                         .flatMap(channel -> channel.join(spec -> spec.setProvider(serverResources.getServerAudioProvider())))
-                        .flatMap(connection -> tts.synthesisTextMono(member, intent.getIntentContext()))
+                        .flatMap(connection -> tts.synthesizeTextMono(member, intent.getIntentContext()))
                         .doOnSuccess(fileLocation -> serverResources.getAudioPlayerManager().loadItem(fileLocation, serverResources.getTrackScheduler()))
                         .then())
                 .then();

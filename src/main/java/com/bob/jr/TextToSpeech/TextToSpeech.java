@@ -22,15 +22,15 @@ public class TextToSpeech {
         textToSpeechClient = TextToSpeechClient.create();
     }
 
-    public Mono<String> synthesisTextMono(Member member, String text) {
-        return Mono.just(synthesisText(member, text));
+    public Mono<String> synthesizeTextMono(Member member, String text) {
+        return Mono.just(synthesizeText(member, text));
     }
 
-    public String synthesisText(String text) {
-        return synthesisText(null, text);
+    public String synthesizeText(String text) {
+        return synthesizeText(null, text);
     }
 
-    public String synthesisText(Member member, String text) {
+    public String synthesizeText(Member member, String text) {
         MemberVoiceConfig memberVoiceConfig = member != null ? getMemberVoice(member) : new MemberVoiceConfig();
 
         SynthesisInput input = SynthesisInput.newBuilder().setText(text).build();
