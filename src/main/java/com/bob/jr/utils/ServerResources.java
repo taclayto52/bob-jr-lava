@@ -15,19 +15,22 @@ public class ServerResources {
     private final AudioPlayer audioPlayer;
     private final AudioPlayerManager audioPlayerManager;
     private final TextToSpeech textToSpeech;
+    private final AudioTrackCache audioTrackCache;
 
     public ServerResources(AudioProvider serverAudioProvider,
                            TrackScheduler trackScheduler,
                            GatewayDiscordClient gatewayClient,
                            AudioPlayer audioPlayer,
                            AudioPlayerManager audioPlayerManager,
-                           TextToSpeech textToSpeech) {
+                           TextToSpeech textToSpeech,
+                           AudioTrackCache audioTrackCache) {
         this.serverAudioProvider = serverAudioProvider;
         this.trackScheduler = trackScheduler;
         this.gatewayClient = gatewayClient;
         this.audioPlayer = audioPlayer;
         this.audioPlayerManager = audioPlayerManager;
         this.textToSpeech = textToSpeech;
+        this.audioTrackCache = audioTrackCache;
     }
 
     public AudioProvider getServerAudioProvider() {
@@ -52,5 +55,9 @@ public class ServerResources {
 
     public TextToSpeech getTextToSpeech() {
         return textToSpeech;
+    }
+
+    public AudioTrackCache getAudioTrackCache() {
+        return audioTrackCache;
     }
 }

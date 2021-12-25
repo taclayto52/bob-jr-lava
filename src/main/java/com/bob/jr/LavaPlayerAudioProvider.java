@@ -10,20 +10,27 @@ import java.nio.ByteBuffer;
 public class LavaPlayerAudioProvider extends AudioProvider {
 
     private final AudioPlayer player;
+    private final AudioPlayer announcementPlayer;
     private final MutableAudioFrame frame = new MutableAudioFrame();
 
-    public LavaPlayerAudioProvider(final AudioPlayer player) {
+    public LavaPlayerAudioProvider(final AudioPlayer player, AudioPlayer announcementPlayer) {
         super(ByteBuffer.allocate(StandardAudioDataFormats.DISCORD_OPUS.maximumChunkSize()));
 
         frame.setBuffer(getBuffer());
         this.player = player;
+        this.announcementPlayer = announcementPlayer;
     }
 
     @Override
     public boolean provide() {
-        final boolean didProvide = player.provide(frame);
+        boolean didProvide;
+        if (player.isPaused()) {
+            didProvide = announcementPlayer.provide(frame);
+        } else {
+            didProvide = player.provide(frame);
+        }
 
-        if(didProvide) {
+        if (didProvide) {
             getBuffer().flip();
         }
         return didProvide;
