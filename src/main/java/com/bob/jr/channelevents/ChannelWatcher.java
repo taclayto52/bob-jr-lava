@@ -33,12 +33,13 @@ public class ChannelWatcher {
         if (testSoundClipLoad) {
             String loadClipString = "https://www.youtube.com/watch?v=2qEG25V2IpM";
             monoVoid = Mono.just(voiceStateUpdateEvent.getCurrent().getMember().block())
+                    .filter(member -> !member.isBot())
                     .flatMap(member -> {
                         AnnouncementTrack announcementTrack = new AnnouncementTrack(loadClipString, member.getDisplayName(), contextAction, 1.0, 3.0);
                         serverResources.getTrackScheduler().addToAnnouncementTrackQueue(announcementTrack);
                         return Mono.just(loadClipString);
                     })
-                    .doOnSuccess(loadUrl -> {
+                    .doOnNext(loadUrl -> {
                         if (!serverResources.getAudioTrackCache().checkIfTrackIsPresent(loadUrl)) {
                             serverResources.getAudioPlayerManager().loadItem(loadUrl, serverResources.getTrackScheduler());
                         } else {
@@ -52,15 +53,20 @@ public class ChannelWatcher {
                     .then();
         } else {
             monoVoid = Mono.just(voiceStateUpdateEvent.getCurrent().getMember().block())
+                    .filter(member -> !member.isBot())
                     .flatMap(member -> {
                         final String userName = member.getDisplayName();
                         AnnouncementTrack announcementTrack = new AnnouncementTrack("synthString", member.getDisplayName(), contextAction, 50.0, 7.0);
                         serverResources.getTrackScheduler().addToAnnouncementTrackQueue(announcementTrack);
                         return serverResources.getTextToSpeech().synthesizeTextMono(member, String.format("%s %s", userName, contextString));
                     })
-                    .doOnSuccess(fileLocation -> {
-                        serverResources.getTrackScheduler().setIsNextTrackAnnouncement(true, 0.0, 0.0);
-                        serverResources.getAudioPlayerManager().loadItem(fileLocation, serverResources.getTrackScheduler());
+                    .doOnNext(fileLocation -> {
+                        if (!serverResources.getAudioTrackCache().checkIfTrackIsPresent("synthString")) {
+                            serverResources.getAudioPlayerManager().loadItem(fileLocation, serverResources.getTrackScheduler());
+                        } else {
+                            final var cachedAudioTrack = serverResources.getAudioTrackCache().getTrackFromCache("synthString");
+                            serverResources.getTrackScheduler().trackLoaded(cachedAudioTrack);
+                        }
                     })
                     .then();
         }
