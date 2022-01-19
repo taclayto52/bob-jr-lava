@@ -34,4 +34,6 @@ jobs:
         
       # Pushes docker image
       - name: Docker push
+        env: 
+          DATA_DOG_API_KEY: ${{ secrets.DATA_DOG_API_KEY }}
         run: ./gradlew dockerPublish --no-daemon
