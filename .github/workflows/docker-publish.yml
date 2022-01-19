@@ -34,4 +34,4 @@ jobs:
         
       # Pushes docker image
       - name: Docker push
-        run: ./gradlew dockerPush --no-daemon
+        run: ./gradlew dockerPublish --no-daemon
