@@ -2,7 +2,6 @@ package com.bob.jr;
 
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
-import com.sedmelluq.discord.lavaplayer.player.event.AudioEventListener;
 import com.sedmelluq.discord.lavaplayer.player.event.TrackEndEvent;
 import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
 import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
@@ -10,7 +9,6 @@ import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Stack;
@@ -24,8 +22,8 @@ public class TrackScheduler implements AudioLoadResultHandler {
     public TrackScheduler(final AudioPlayer player) {
         this.player = player;
         player.addListener((event -> {
-            if(event instanceof TrackEndEvent) {
-                if(!currentPlaylist.isEmpty()) {
+            if (event instanceof TrackEndEvent) {
+                if (!currentPlaylist.isEmpty()) {
                     trackLoaded(currentPlaylist.pop());
                 }
             }

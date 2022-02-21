@@ -4,7 +4,7 @@ plugins {
     id 'application'
 }
 
-project.setVersion("0.0.2")
+project.setVersion("0.0.3")
 
 repositories {   // repositories for Jar's you access in your code
     jcenter()
@@ -21,7 +21,7 @@ application {
 tasks.create('dockerBuild').dependsOn(shadowJar).doLast({
     exec {
         executable 'docker'
-        args 'build', '--build-arg', 'PROJECT_VERSION='+project.getVersion(), '-t', 'taclayt2/bob-jr-lava:' + project.getVersion() , '.'
+        args 'build', '--build-arg', 'PROJECT_VERSION=' + project.getVersion(), '-t', 'taclayt2/bob-jr-lava:' + project.getVersion(), '.'
     }
 })
 
