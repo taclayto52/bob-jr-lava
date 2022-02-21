@@ -99,11 +99,11 @@ public class BobJr {
                         .flatMap(this::handleMessageCreateEvent))
                 .subscribe();
 
+
         // register member listener
         client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
                 .flatMap(channelWatcher::voiceStateUpdateEventHandler)
                 .subscribe();
-
 
         // block until disconnect
         client.onDisconnect().block();
@@ -122,6 +122,22 @@ public class BobJr {
             logger.error(ioe.getMessage());
         }
         return tts;
+    }
+
+    public Mono<MessageCreateEvent> maybeGetGuildRoles(MessageCreateEvent messageCreateEvent) {
+        final var guild = messageCreateEvent.getGuild().block();
+        botRoles.computeIfAbsent(guild, guild1 -> guild1.getSelfMember().block().getRoles().collectList().block());
+        return Mono.just(messageCreateEvent);
+    }
+
+    public Mono<Void> handleMessageCreateEvent(Intent intent) {
+        return Flux.fromIterable(commands.entrySet())
+                .filter(entry -> intent.getIntentName().equals(entry.getKey()))
+                .flatMap(entry -> entry.getValue().execute(intent))
+                .onErrorContinue((throwable, o) -> {
+                    throwable.printStackTrace();
+                })
+                .next();
     }
 
     public Mono<MessageCreateEvent> maybeGetGuildRoles(MessageCreateEvent messageCreateEvent) {
