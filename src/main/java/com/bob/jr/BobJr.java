@@ -140,22 +140,6 @@ public class BobJr {
                 .next();
     }
 
-    public Mono<MessageCreateEvent> maybeGetGuildRoles(MessageCreateEvent messageCreateEvent) {
-        final var guild = messageCreateEvent.getGuild().block();
-        botRoles.computeIfAbsent(guild, guild1 -> guild1.getSelfMember().block().getRoles().collectList().block());
-        return Mono.just(messageCreateEvent);
-    }
-
-    public Mono<Void> handleMessageCreateEvent(Intent intent) {
-        return Flux.fromIterable(commands.entrySet())
-                .filter(entry -> intent.getIntentName().equals(entry.getKey()))
-                .flatMap(entry -> entry.getValue().execute(intent))
-                .onErrorContinue((throwable, o) -> {
-                    throwable.printStackTrace();
-                })
-                .next();
-    }
-
     public ServerResources setupPlayerAndCommands(TextToSpeech tts, GatewayDiscordClient client) {
         // setup audio player
         final AudioPlayerManager playerManager = new DefaultAudioPlayerManager();
