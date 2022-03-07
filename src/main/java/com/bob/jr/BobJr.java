@@ -54,6 +54,8 @@ public class BobJr {
                 .then());
     }
 
+    private final HeartBeats heartBeats;
+
     public BobJr(Optional<String> token) {
         // setup GCloud text to speech
         TextToSpeech tts = setupTextToSpeech();
@@ -105,8 +107,13 @@ public class BobJr {
                 .flatMap(channelWatcher::voiceStateUpdateEventHandler)
                 .subscribe();
 
+        // add heartbeats
+        heartBeats = new HeartBeats();
+        heartBeats.startAsync().awaitRunning();
+
         // block until disconnect
         client.onDisconnect().block();
+        heartBeats.stopAsync();
     }
 
     public static void main(String[] args) {
