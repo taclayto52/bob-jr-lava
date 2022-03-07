@@ -4,7 +4,7 @@ plugins {
     id 'application'
 }
 
-project.setVersion("0.0.3")
+project.setVersion("0.0.4")
 
 repositories {   // repositories for Jar's you access in your code
     jcenter()
