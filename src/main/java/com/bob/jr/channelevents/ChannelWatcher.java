@@ -5,6 +5,9 @@ import com.bob.jr.utils.ServerResources;
 import discord4j.core.event.domain.VoiceStateUpdateEvent;
 import reactor.core.publisher.Mono;
 
+import java.util.Locale;
+import java.util.Random;
+
 public class ChannelWatcher {
 
     private final ServerResources serverResources;
@@ -29,37 +32,32 @@ public class ChannelWatcher {
         }
 
         Mono<Void> monoVoid = null;
-        serverResources.getTrackScheduler().togglePlayers();
-        if (testSoundClipLoad) {
-            String loadClipString = "https://www.youtube.com/watch?v=2qEG25V2IpM";
-            monoVoid = Mono.just(voiceStateUpdateEvent.getCurrent().getMember().block())
-                    .filter(member -> !member.isBot())
-                    .flatMap(member -> {
-                        AnnouncementTrack announcementTrack = new AnnouncementTrack(loadClipString, member.getDisplayName(), contextAction, 1.0, 3.0);
-                        serverResources.getTrackScheduler().addToAnnouncementTrackQueue(announcementTrack);
-                        return Mono.just(loadClipString);
-                    })
-                    .doOnNext(loadUrl -> {
-                        if (!serverResources.getAudioTrackCache().checkIfTrackIsPresent(loadUrl)) {
-                            serverResources.getAudioPlayerManager().loadItem(loadUrl, serverResources.getTrackScheduler());
-                        } else {
-                            // TODO need to implement way of loading a file directly from memory instead of a file
-                            final var cachedAudioTrack = serverResources.getAudioTrackCache().getTrackFromCache(loadUrl);
-                            serverResources.getTrackScheduler().trackLoaded(cachedAudioTrack);
-                        }
+//        serverResources.getTrackScheduler().setAnnouncementPlayer();
+        final var member = Mono.justOrEmpty(voiceStateUpdateEvent.getCurrent().getMember().block()).block();
+        final var memberDisplayName = member.getDisplayName();
+        if (member.isBot()) {
+            return Mono.empty();
+        }
+        if (testSoundClipLoad && memberDisplayName.toLowerCase(Locale.ROOT).contains("vsepr")) {
+            String loadClipString = "https://www.youtube.com/watch?v=LfwJJ6s66GE";
 
+            final var randomStartTime = new Random().nextInt(80);
+            AnnouncementTrack announcementTrack = new AnnouncementTrack(loadClipString, member.getDisplayName(), contextAction, randomStartTime, randomStartTime + 5);
+            serverResources.getTrackScheduler().addToAnnouncementTrackQueue(announcementTrack);
 
-                    })
-                    .then();
+            if (!serverResources.getAudioTrackCache().checkIfTrackIsPresent(loadClipString)) {
+                serverResources.getAudioPlayerManager().loadItem(loadClipString, serverResources.getTrackScheduler());
+            } else {
+                // TODO need to implement way of loading a file directly from memory instead of a file
+                final var cachedAudioTrack = serverResources.getAudioTrackCache().getTrackFromCache(loadClipString);
+                serverResources.getTrackScheduler().trackLoaded(cachedAudioTrack);
+            }
+            monoVoid = Mono.empty();
         } else {
-            monoVoid = Mono.just(voiceStateUpdateEvent.getCurrent().getMember().block())
-                    .filter(member -> !member.isBot())
-                    .flatMap(member -> {
-                        final String userName = member.getDisplayName();
-                        AnnouncementTrack announcementTrack = new AnnouncementTrack("synthString", member.getDisplayName(), contextAction, 50.0, 7.0);
-                        serverResources.getTrackScheduler().addToAnnouncementTrackQueue(announcementTrack);
-                        return serverResources.getTextToSpeech().synthesizeTextMono(member, String.format("%s %s", userName, contextString));
-                    })
+            final String userName = member.getDisplayName();
+            AnnouncementTrack announcementTrack = new AnnouncementTrack("synthString", member.getDisplayName(), contextAction);
+            serverResources.getTrackScheduler().addToAnnouncementTrackQueue(announcementTrack);
+            monoVoid = Mono.justOrEmpty(serverResources.getTextToSpeech().synthesizeTextMono(member, String.format("%s %s", userName, contextString)).block())
                     .doOnNext(fileLocation -> {
                         if (!serverResources.getAudioTrackCache().checkIfTrackIsPresent("synthString")) {
                             serverResources.getAudioPlayerManager().loadItem(fileLocation, serverResources.getTrackScheduler());

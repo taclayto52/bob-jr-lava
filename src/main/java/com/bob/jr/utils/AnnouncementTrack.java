@@ -8,6 +8,10 @@ public class AnnouncementTrack {
     private final double endTime;
     private final Actions action;
 
+    public AnnouncementTrack(String trackUrl, String member, Actions action) {
+        this(trackUrl, member, action, 0, 0);
+    }
+
     public AnnouncementTrack(String trackUrl, String member, Actions action, double startTime, double endTime) {
         this.trackUrl = trackUrl;
         this.member = member;
