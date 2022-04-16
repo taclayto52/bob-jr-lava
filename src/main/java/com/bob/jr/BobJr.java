@@ -141,7 +141,8 @@ public class BobJr {
         return Flux.fromIterable(commands.entrySet())
                 .filter(entry -> intent.getIntentName().equals(entry.getKey()))
                 .flatMap(entry -> entry.getValue().execute(intent))
-                .onErrorContinue((throwable, o) -> {
+                .doOnError(throwable -> {
+                    logger.error(String.format("Error noticed in handleMessageCreateEvent {}", throwable.getMessage()));
                     throwable.printStackTrace();
                 })
                 .next();
@@ -156,6 +157,7 @@ public class BobJr {
         AudioSourceManagers.registerLocalSource(playerManager);
 
         final AudioPlayer player = playerManager.createPlayer();
+        player.setVolume(50);
         final AudioPlayer announcementPlayer = playerManager.createPlayer();
         announcementPlayer.setPaused(true);
 
@@ -181,6 +183,7 @@ public class BobJr {
         commands.put("play", playerCommands::play);
         commands.put("search", playerCommands::search);
         commands.put("playlist", playerCommands::playlist);
+        commands.put("volume", playerCommands::setVolume);
 
         // rick
         commands.put("rick", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())

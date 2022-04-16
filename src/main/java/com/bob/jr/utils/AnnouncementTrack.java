@@ -12,6 +12,7 @@ public class AnnouncementTrack {
         this(trackUrl, member, action, 0, 0);
     }
 
+    // startTime and endTime in seconds
     public AnnouncementTrack(String trackUrl, String member, Actions action, double startTime, double endTime) {
         this.trackUrl = trackUrl;
         this.member = member;

@@ -22,6 +22,27 @@ public class PlayerCommands {
         this.serverResources = serverResources;
     }
 
+    public Mono<Void> setVolume(Intent intent) {
+        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
+                .flatMap(Message::getChannel)
+                .doOnSuccess(messageChannel -> {
+                    var volume = -1; // -1 to indicate never set
+                    String intentContext = intent.getIntentContext();
+                    if (intentContext != null) {
+                        volume = Integer.parseInt(intentContext.split(" ")[0]);
+                    }
+
+
+                    if (volume != -1) {
+                        serverResources.getAudioPlayer().setVolume(volume);
+                    } else {
+                        volume = serverResources.getAudioPlayer().getVolume();
+                    }
+                    messageChannel.createMessage(String.format("Volume set at %s", volume)).block();
+                })
+                .then();
+    }
+
     public Mono<Void> play(Intent intent) {
         return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
                 .flatMap(Member::getVoiceState)
@@ -48,15 +69,15 @@ public class PlayerCommands {
                 .flatMap(messageChannel -> {
                     List<AudioTrack> audioTrackList = scheduler.getAudioTracks();
                     StringBuilder printString = new StringBuilder();
-                    if(audioTrackList.isEmpty() && Optional.ofNullable(player.getPlayingTrack()).isEmpty()) {
+                    if (audioTrackList.isEmpty() && Optional.ofNullable(player.getPlayingTrack()).isEmpty()) {
                         printString.append(":no_mouth: No playlist currently set");
-                    } else{
-                        if(Optional.ofNullable(player.getPlayingTrack()).isPresent()) {
+                    } else {
+                        if (Optional.ofNullable(player.getPlayingTrack()).isPresent()) {
                             printString.append(String.format(":loud_sound: **Currently playing:** %s%n", player.getPlayingTrack().getInfo().title));
                         }
-                        for(int i=0; i<audioTrackList.size(); i++) {
+                        for (int i = 0; i < audioTrackList.size(); i++) {
                             String appendString = String.format("%d: %s%n", i + 1, audioTrackList.get(i).getInfo().title);
-                            if(printString.length() + appendString.length() + 20 >= MESSAGE_LIMIT
+                            if (printString.length() + appendString.length() + 20 >= MESSAGE_LIMIT
                                     || i == PLAYLIST_RETURN_LIMIT) {
                                 printString.append(String.format("And %d more...", audioTrackList.size() - i));
                                 break;
