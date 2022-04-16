@@ -54,6 +54,8 @@ public class BobJr {
                 .then());
     }
 
+    private final HeartBeats heartBeats;
+
     public BobJr(Optional<String> token) {
         // setup GCloud text to speech
         TextToSpeech tts = setupTextToSpeech();
@@ -105,8 +107,19 @@ public class BobJr {
                 .flatMap(channelWatcher::voiceStateUpdateEventHandler)
                 .subscribe();
 
+
+        // register member listener
+        client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
+                .flatMap(channelWatcher::voiceStateUpdateEventHandler)
+                .subscribe();
+
+        // add heartbeats
+        heartBeats = new HeartBeats();
+        heartBeats.startAsync().awaitRunning();
+
         // block until disconnect
         client.onDisconnect().block();
+        heartBeats.stopAsync();
     }
 
     public static void main(String[] args) {
@@ -134,23 +147,8 @@ public class BobJr {
         return Flux.fromIterable(commands.entrySet())
                 .filter(entry -> intent.getIntentName().equals(entry.getKey()))
                 .flatMap(entry -> entry.getValue().execute(intent))
-                .onErrorContinue((throwable, o) -> {
-                    throwable.printStackTrace();
-                })
-                .next();
-    }
-
-    public Mono<MessageCreateEvent> maybeGetGuildRoles(MessageCreateEvent messageCreateEvent) {
-        final var guild = messageCreateEvent.getGuild().block();
-        botRoles.computeIfAbsent(guild, guild1 -> guild1.getSelfMember().block().getRoles().collectList().block());
-        return Mono.just(messageCreateEvent);
-    }
-
-    public Mono<Void> handleMessageCreateEvent(Intent intent) {
-        return Flux.fromIterable(commands.entrySet())
-                .filter(entry -> intent.getIntentName().equals(entry.getKey()))
-                .flatMap(entry -> entry.getValue().execute(intent))
-                .onErrorContinue((throwable, o) -> {
+                .doOnError(throwable -> {
+                    logger.error(String.format("Error noticed in handleMessageCreateEvent {}", throwable.getMessage()));
                     throwable.printStackTrace();
                 })
                 .next();
@@ -165,6 +163,7 @@ public class BobJr {
         AudioSourceManagers.registerLocalSource(playerManager);
 
         final AudioPlayer player = playerManager.createPlayer();
+        player.setVolume(50);
         final AudioPlayer announcementPlayer = playerManager.createPlayer();
         announcementPlayer.setPaused(true);
 
@@ -190,6 +189,7 @@ public class BobJr {
         commands.put("play", playerCommands::play);
         commands.put("search", playerCommands::search);
         commands.put("playlist", playerCommands::playlist);
+        commands.put("volume", playerCommands::setVolume);
 
         // rick
         commands.put("rick", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())

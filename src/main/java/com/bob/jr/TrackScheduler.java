@@ -2,10 +2,8 @@ package com.bob.jr;
 
 import com.bob.jr.utils.AnnouncementTrack;
 import com.bob.jr.utils.AudioTrackCache;
-import com.google.common.util.concurrent.AtomicDouble;
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
-import com.sedmelluq.discord.lavaplayer.player.event.TrackEndEvent;
 import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
 import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
@@ -31,8 +29,6 @@ public class TrackScheduler implements AudioLoadResultHandler {
     private final AudioTrackCache audioTrackCache;
 
     private AtomicBoolean isNextTrackAnnouncement = new AtomicBoolean(false);
-    private AtomicDouble startTime = new AtomicDouble(0);
-    private AtomicDouble duration = new AtomicDouble(0);
 
     @Deprecated
     public TrackScheduler(final AudioPlayer player) {
@@ -42,23 +38,7 @@ public class TrackScheduler implements AudioLoadResultHandler {
     public TrackScheduler(final AudioPlayer player, final AudioPlayer announcementPlayer, final AudioTrackCache audioTrackCache) {
         this.player = player;
         this.announcementPlayer = announcementPlayer;
-        player.addListener((event -> {
-            synchronized (isNextTrackAnnouncement) {
-                if (event instanceof TrackEndEvent) {
-                    if (!currentPlaylist.isEmpty() && !isNextTrackAnnouncement.get()) {
-                        trackLoaded(currentPlaylist.pop());
-                    }
-                }
-                // else do nothing
-            }
-        }));
         this.audioTrackCache = audioTrackCache;
-    }
-
-    public synchronized void setIsNextTrackAnnouncement(boolean value, double startTime, double duration) {
-        isNextTrackAnnouncement.set(value);
-        this.startTime.set(startTime);
-        this.duration.set(duration);
     }
 
     public void clearPlaylist() {
@@ -79,7 +59,13 @@ public class TrackScheduler implements AudioLoadResultHandler {
 
                 // handle upcoming announcement
                 track.setPosition(Math.round(announcementTrack.getStartTime() * 1000));
-                TrackMarker trackMarker = new TrackMarker(Math.round(announcementTrack.getStartTime() + announcementTrack.getEndTime()) * 1000, (markerState) -> {
+                long setEndTime;
+                if (announcementTrack.getEndTime() == 0) {
+                    setEndTime = track.getDuration();
+                } else {
+                    setEndTime = Math.round(announcementTrack.getEndTime()) * 1000;
+                }
+                TrackMarker trackMarker = new TrackMarker(setEndTime, (markerState) -> {
                     if (markerState == TrackMarkerHandler.MarkerState.REACHED) {
                         logger.debug("Marker has been reached");
                     } else if (markerState == TrackMarkerHandler.MarkerState.ENDED) {
@@ -89,11 +75,13 @@ public class TrackScheduler implements AudioLoadResultHandler {
                     }
                     announcementTracks.remove(announcementTrack.getTrackUrl());
                     announcementPlayer.stopTrack();
-                    togglePlayers();
+                    setTrackPlayer();
                 });
                 track.setMarker(trackMarker);
+                setAnnouncementPlayer();
                 announcementPlayer.playTrack(track);
             } else {
+                setTrackPlayer();
                 player.stopTrack();
                 player.playTrack(track);
             }
@@ -134,14 +122,14 @@ public class TrackScheduler implements AudioLoadResultHandler {
         announcementTracks.putIfAbsent(announcementTrackKey, announcementTrack);
     }
 
-    public synchronized void togglePlayers() {
-        if (player.isPaused()) {
-            player.setPaused(false);
-            announcementPlayer.setPaused(true);
-        } else {
-            player.setPaused(true);
-            announcementPlayer.setPaused(false);
-        }
+    public synchronized void setAnnouncementPlayer() {
+        player.setPaused(true);
+        announcementPlayer.setPaused(false);
+    }
+
+    public synchronized void setTrackPlayer() {
+        announcementPlayer.setPaused(true);
+        player.setPaused(false);
     }
 
 }
