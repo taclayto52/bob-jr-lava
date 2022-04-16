@@ -1,11 +1,13 @@
 package com.bob.jr;
 
 import com.bob.jr.TextToSpeech.TextToSpeech;
+import com.bob.jr.channelevents.ChannelWatcher;
 import com.bob.jr.commands.BasicCommands;
 import com.bob.jr.commands.PlayerCommands;
 import com.bob.jr.commands.VoiceCommands;
 import com.bob.jr.interfaces.Command;
 import com.bob.jr.interfaces.VoidCommand;
+import com.bob.jr.utils.AudioTrackCache;
 import com.bob.jr.utils.ServerResources;
 import com.google.cloud.secretmanager.v1.AccessSecretVersionResponse;
 import com.google.cloud.secretmanager.v1.SecretManagerServiceClient;
@@ -17,6 +19,7 @@ import com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers;
 import com.sedmelluq.discord.lavaplayer.track.playback.NonAllocatingAudioFrameBuffer;
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
+import discord4j.core.event.domain.VoiceStateUpdateEvent;
 import discord4j.core.event.domain.message.MessageCreateEvent;
 import discord4j.core.object.VoiceState;
 import discord4j.core.object.entity.Guild;
@@ -82,7 +85,10 @@ public class BobJr {
         botNickName = nickNameBuffer.replace(indexOfAt, indexOfAt + 1, "@!").toString();
 
         // setup commands
-        setupPlayerAndCommands(tts, client);
+        ServerResources serverResources = setupPlayerAndCommands(tts, client);
+
+        // setup Channel Watcher
+        ChannelWatcher channelWatcher = new ChannelWatcher(serverResources);
 
         // register events
         client.getEventDispatcher().on(MessageCreateEvent.class)
@@ -91,6 +97,12 @@ public class BobJr {
                         .filter(content -> checkAndReturnBotName(content, event) != null)
                         .map(content -> extractIntent(content, event))
                         .flatMap(this::handleMessageCreateEvent))
+                .subscribe();
+
+
+        // register member listener
+        client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
+                .flatMap(channelWatcher::voiceStateUpdateEventHandler)
                 .subscribe();
 
         // block until disconnect
@@ -128,7 +140,23 @@ public class BobJr {
                 .next();
     }
 
-    public void setupPlayerAndCommands(TextToSpeech tts, GatewayDiscordClient client) {
+    public Mono<MessageCreateEvent> maybeGetGuildRoles(MessageCreateEvent messageCreateEvent) {
+        final var guild = messageCreateEvent.getGuild().block();
+        botRoles.computeIfAbsent(guild, guild1 -> guild1.getSelfMember().block().getRoles().collectList().block());
+        return Mono.just(messageCreateEvent);
+    }
+
+    public Mono<Void> handleMessageCreateEvent(Intent intent) {
+        return Flux.fromIterable(commands.entrySet())
+                .filter(entry -> intent.getIntentName().equals(entry.getKey()))
+                .flatMap(entry -> entry.getValue().execute(intent))
+                .onErrorContinue((throwable, o) -> {
+                    throwable.printStackTrace();
+                })
+                .next();
+    }
+
+    public ServerResources setupPlayerAndCommands(TextToSpeech tts, GatewayDiscordClient client) {
         // setup audio player
         final AudioPlayerManager playerManager = new DefaultAudioPlayerManager();
         playerManager.getConfiguration().setFrameBufferFactory(NonAllocatingAudioFrameBuffer::new);
@@ -137,12 +165,17 @@ public class BobJr {
         AudioSourceManagers.registerLocalSource(playerManager);
 
         final AudioPlayer player = playerManager.createPlayer();
+        final AudioPlayer announcementPlayer = playerManager.createPlayer();
+        announcementPlayer.setPaused(true);
+
+        // init AudioTrackCache
+        final AudioTrackCache audioTrackCache = new AudioTrackCache();
 
         // create scheduler
-        final TrackScheduler scheduler = new TrackScheduler(player);
+        final TrackScheduler scheduler = new TrackScheduler(player, announcementPlayer, audioTrackCache);
 
-        AudioProvider provider = new LavaPlayerAudioProvider(player);
-        ServerResources serverResources = new ServerResources(provider, scheduler, client, player, playerManager, tts);
+        AudioProvider provider = new LavaPlayerAudioProvider(player, announcementPlayer);
+        ServerResources serverResources = new ServerResources(provider, scheduler, client, player, playerManager, tts, audioTrackCache);
         BasicCommands basicCommands = new BasicCommands(serverResources);
         PlayerCommands playerCommands = new PlayerCommands(serverResources);
         VoiceCommands voiceCommands = new VoiceCommands(serverResources);
@@ -175,6 +208,8 @@ public class BobJr {
 
         // tts
         commands.put("tts", voiceCommands::tts);
+
+        return serverResources;
     }
 
     public Intent extractIntent(String incomingMessage, MessageCreateEvent event) {

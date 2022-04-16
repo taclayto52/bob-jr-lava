@@ -34,6 +34,7 @@ tasks.create('dockerPublish').dependsOn(dockerBuild).doLast({
 
 dependencies {
     implementation platform('com.google.cloud:libraries-bom:20.9.0')
+    implementation group: 'com.google.guava', name: 'guava', version: '31.0.1-jre'
     implementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
     implementation group: 'com.discord4j', name: 'discord4j-core', version: '3.1.5'
     implementation group: 'com.sedmelluq', name: 'lavaplayer', version: '1.3.76'
