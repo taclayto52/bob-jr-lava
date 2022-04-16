@@ -107,6 +107,12 @@ public class BobJr {
                 .flatMap(channelWatcher::voiceStateUpdateEventHandler)
                 .subscribe();
 
+
+        // register member listener
+        client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
+                .flatMap(channelWatcher::voiceStateUpdateEventHandler)
+                .subscribe();
+
         // add heartbeats
         heartBeats = new HeartBeats();
         heartBeats.startAsync().awaitRunning();
