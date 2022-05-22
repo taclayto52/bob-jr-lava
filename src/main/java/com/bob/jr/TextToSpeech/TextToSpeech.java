@@ -1,7 +1,11 @@
 package com.bob.jr.TextToSpeech;
 
+import com.google.cloud.storage.BlobInfo;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageException;
 import com.google.cloud.texttospeech.v1.*;
 import com.google.protobuf.ByteString;
+import discord4j.common.util.Snowflake;
 import discord4j.core.object.entity.Member;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,12 +18,52 @@ import java.util.Optional;
 
 public class TextToSpeech {
 
-    private static final Map<Member, MemberVoiceConfig> memberVoiceMap = new HashMap<>();
+    private static final Map<Snowflake, MemberVoiceConfig> memberVoiceMap = new HashMap<>();
+    private static final String NEARLINE_BOBJR_SETTINGS = "nearline-bobjr-settings";
+    private static final String MEMBER_VOICE_SETTINGS_FOLDER = "member-voice-settings";
     private final TextToSpeechClient textToSpeechClient;
     private final Logger logger = LoggerFactory.getLogger(TextToSpeech.class);
 
+    private final Optional<Storage> gStorageOptional;
+
     public TextToSpeech() throws IOException {
+        this(null);
+    }
+
+    public TextToSpeech(Storage gStorage) throws IOException {
         textToSpeechClient = TextToSpeechClient.create();
+        final var loadFromStorage = true;
+        if (gStorage != null) {
+            gStorageOptional = Optional.of(gStorage);
+            if (!loadFromStorage) {
+                return;
+            }
+            // read in any user data in the bucket
+            final var voiceSettingsPages = gStorage.list(NEARLINE_BOBJR_SETTINGS, Storage.BlobListOption.currentDirectory(), Storage.BlobListOption.prefix(MEMBER_VOICE_SETTINGS_FOLDER + "/"));
+            // read voice settings
+            voiceSettingsPages.iterateAll().forEach((blob) -> {
+                if (blob.isDirectory()) {
+                    return;
+                }
+
+                String blobName = blob.getName();
+                if (blobName.endsWith("/")) {
+                    return;
+                }
+
+                final var memberId = blobName.split("/")[1];
+                final var byteArrayInputStream = new ByteArrayInputStream(blob.getContent());
+                try {
+                    final var memberVoiceConfig = MemberVoiceConfig.unwrapMessageBuffer(byteArrayInputStream);
+                    setMemberVoiceConfigDirect(Snowflake.of(memberId), memberVoiceConfig);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+
+        } else {
+            gStorageOptional = Optional.empty();
+        }
     }
 
     public Mono<String> synthesizeTextMono(Member member, String text) {
@@ -90,12 +134,44 @@ public class TextToSpeech {
     }
 
     public MemberVoiceConfig getMemberVoice(Member member) {
-        Optional<MemberVoiceConfig> optionalMemberVoiceConfig = Optional.ofNullable(memberVoiceMap.putIfAbsent(member, new MemberVoiceConfig()));
-        return optionalMemberVoiceConfig.orElse(memberVoiceMap.get(member));
+        final var memberId = member.getId();
+        Optional<MemberVoiceConfig> optionalMemberVoiceConfig = Optional.ofNullable(memberVoiceMap.putIfAbsent(memberId, new MemberVoiceConfig()));
+        return optionalMemberVoiceConfig.orElse(memberVoiceMap.get(memberId));
+    }
+
+
+    // used for voice loading only
+    public void setMemberVoiceConfigDirect(Snowflake memberId, MemberVoiceConfig memberVoiceConfig) {
+        memberVoiceMap.put(memberId, memberVoiceConfig);
     }
 
     public String getMemberVoiceString(Member member) {
         return getMemberVoice(member).toString();
+    }
+
+    public Mono<Boolean> persistMemberConfigToStorage(Member member) {
+        if (gStorageOptional.isEmpty()) {
+            return Mono.just(true);
+        } else {
+            final var gStorage = gStorageOptional.get();
+            final BlobInfo blobInfo = BlobInfo.newBuilder(NEARLINE_BOBJR_SETTINGS, MEMBER_VOICE_SETTINGS_FOLDER + "/" + member.getId().asString()).build();
+
+
+            final var memberVoiceConfig = getMemberVoice(member);
+            final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            boolean storageSuccessful = false;
+            try {
+                byteArrayOutputStream.writeBytes(memberVoiceConfig.toMessageBuffer().array());
+
+                gStorage.create(blobInfo, byteArrayOutputStream.toByteArray());
+                storageSuccessful = true;
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (StorageException storageException) {
+                // TODO print error and do something special?
+            }
+            return Mono.just(storageSuccessful);
+        }
     }
 
 }

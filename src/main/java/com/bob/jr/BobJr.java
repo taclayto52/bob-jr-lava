@@ -12,6 +12,8 @@ import com.bob.jr.utils.ServerResources;
 import com.google.cloud.secretmanager.v1.AccessSecretVersionResponse;
 import com.google.cloud.secretmanager.v1.SecretManagerServiceClient;
 import com.google.cloud.secretmanager.v1.SecretVersionName;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageOptions;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
@@ -57,8 +59,10 @@ public class BobJr {
     private final HeartBeats heartBeats;
 
     public BobJr(Optional<String> token) {
+        // setup storage
+        Storage gStorage = StorageOptions.getDefaultInstance().getService();
         // setup GCloud text to speech
-        TextToSpeech tts = setupTextToSpeech();
+        TextToSpeech tts = setupTextToSpeech(gStorage);
 
         // try to get secret
         String secretToken = null;
@@ -127,10 +131,10 @@ public class BobJr {
         new BobJr(optionalSecret);
     }
 
-    public static TextToSpeech setupTextToSpeech() {
+    public static TextToSpeech setupTextToSpeech(Storage gStorage) {
         TextToSpeech tts = null;
         try {
-            tts = new TextToSpeech();
+            tts = new TextToSpeech(gStorage);
         } catch (IOException ioe) {
             logger.error(ioe.getMessage());
         }
@@ -205,6 +209,7 @@ public class BobJr {
         commands.put("myvoice", voiceCommands::myVoice);
         commands.put("pitch", voiceCommands::pitch);
         commands.put("speaking-rate", voiceCommands::speakingRate);
+        commands.put("save-voice", voiceCommands::saveVoice);
 
         // tts
         commands.put("tts", voiceCommands::tts);
