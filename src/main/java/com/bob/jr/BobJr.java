@@ -20,11 +20,15 @@ import com.sedmelluq.discord.lavaplayer.track.playback.NonAllocatingAudioFrameBu
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.VoiceStateUpdateEvent;
+import discord4j.core.event.domain.command.ApplicationCommandCreateEvent;
+import discord4j.core.event.domain.interaction.ApplicationCommandInteractionEvent;
 import discord4j.core.event.domain.message.MessageCreateEvent;
 import discord4j.core.object.VoiceState;
+import discord4j.core.object.command.ApplicationCommand;
 import discord4j.core.object.entity.Guild;
 import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.Role;
+import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.voice.AudioProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,6 +90,10 @@ public class BobJr {
         int indexOfAt = nickNameBuffer.indexOf("@");
         botNickName = nickNameBuffer.replace(indexOfAt, indexOfAt + 1, "@!").toString();
 
+        // get application id
+        final var applicationId = client.getApplicationInfo().block().getId();
+
+
         // setup commands
         ServerResources serverResources = setupPlayerAndCommands(tts, client);
 
@@ -101,6 +109,42 @@ public class BobJr {
                         .flatMap(this::handleMessageCreateEvent))
                 .subscribe();
 
+        final ApplicationCommandRequest joinApplicationCommand = ApplicationCommandRequest.builder()
+                .name("join-slash")
+                .type(ApplicationCommand.Type.CHAT_INPUT.getValue())
+                .description("Have the bot join the channel")
+                .build();
+
+        client.getEventDispatcher().on(ApplicationCommandCreateEvent.class)
+                .flatMap(applicationCommandCreateEvent -> {
+                    logger.info(applicationCommandCreateEvent.getCommand().getName() + " created!");
+                    return Mono.empty();
+                })
+                .subscribe();
+
+        client.getRestClient().getApplicationService()
+                .createGlobalApplicationCommand(applicationId.asLong(), joinApplicationCommand)
+                .flatMap(applicationCommandData -> {
+                    logger.info(String.format("Sent request to create application command %s", applicationCommandData.name()));
+                    return Mono.empty();
+                })
+                .subscribe();
+
+        client.getRestClient().getApplicationService().getGlobalApplicationCommands(applicationId.asLong())
+                .flatMap(applicationCommandData -> {
+                    logger.info(String.format("Got application command from global reg: %s", applicationCommandData.name()));
+                    return Mono.empty();
+                }).subscribe();
+
+        client.getEventDispatcher().on(ApplicationCommandInteractionEvent.class)
+                .flatMap(applicationCommandInteractionEvent -> {
+                    logger.info(String.format("Interaction with %s!", applicationCommandInteractionEvent.getCommandName()));
+                    return Mono.empty();
+                }).subscribe();
+
+
+//        client.getGuilds().flatMap(guild -> {
+//        });
 
         // register member listener
         client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
