@@ -27,19 +27,23 @@ public class TextToSpeech {
     private final Optional<Storage> gStorageOptional;
 
     public TextToSpeech() throws IOException {
-        this(null);
+        this(Optional.empty());
     }
 
-    public TextToSpeech(Storage gStorage) throws IOException {
+    public TextToSpeech(Optional<Storage> gStorageOptional) throws IOException {
         textToSpeechClient = TextToSpeechClient.create();
+        this.gStorageOptional = gStorageOptional;
+        retrieveVoiceSettingsFromStorage(gStorageOptional);
+    }
+
+    private void retrieveVoiceSettingsFromStorage(Optional<Storage> gStorageOptional) {
         final var loadFromStorage = true;
-        if (gStorage != null) {
-            gStorageOptional = Optional.of(gStorage);
+        if (gStorageOptional.isPresent()) {
             if (!loadFromStorage) {
                 return;
             }
             // read in any user data in the bucket
-            final var voiceSettingsPages = gStorage.list(NEARLINE_BOBJR_SETTINGS, Storage.BlobListOption.currentDirectory(), Storage.BlobListOption.prefix(MEMBER_VOICE_SETTINGS_FOLDER + "/"));
+            final var voiceSettingsPages = gStorageOptional.get().list(NEARLINE_BOBJR_SETTINGS, Storage.BlobListOption.currentDirectory(), Storage.BlobListOption.prefix(MEMBER_VOICE_SETTINGS_FOLDER + "/"));
             // read voice settings
             voiceSettingsPages.iterateAll().forEach((blob) -> {
                 if (blob.isDirectory()) {
@@ -60,9 +64,6 @@ public class TextToSpeech {
                     e.printStackTrace();
                 }
             });
-
-        } else {
-            gStorageOptional = Optional.empty();
         }
     }
 
@@ -165,10 +166,11 @@ public class TextToSpeech {
 
                 gStorage.create(blobInfo, byteArrayOutputStream.toByteArray());
                 storageSuccessful = true;
-            } catch (IOException e) {
-                e.printStackTrace();
             } catch (StorageException storageException) {
-                // TODO print error and do something special?
+                logger.error(String.format("Storage exception: %s", storageException.getMessage()));
+                return Mono.error(storageException);
+            } catch (IOException exception) {
+                return Mono.error(exception);
             }
             return Mono.just(storageSuccessful);
         }
