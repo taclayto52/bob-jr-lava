@@ -4,16 +4,16 @@ import com.google.cloud.texttospeech.v1.AudioConfig;
 import com.google.cloud.texttospeech.v1.AudioEncoding;
 import com.google.cloud.texttospeech.v1.SsmlVoiceGender;
 import com.google.cloud.texttospeech.v1.VoiceSelectionParams;
+import org.msgpack.core.MessageBufferPacker;
+import org.msgpack.core.MessagePack;
+import org.msgpack.core.buffer.MessageBuffer;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.Locale;
 import java.util.Optional;
 
 public class MemberVoiceConfig {
-
-    private VoiceSelectionParams voiceSelectionParams;
-    private AudioConfig audioConfig;
-    private final VoiceSelectionParams.Builder voiceSelectionParamsBuilder;
-    private final AudioConfig.Builder audioConfigBuilder;
 
     private static final String defaultVoiceString = "en-US-Standard-A";
     private static final VoiceSelectionParams.Builder defaultVoiceSelectionParamsBuilder = VoiceSelectionParams.newBuilder()
@@ -24,30 +24,78 @@ public class MemberVoiceConfig {
     private static final AudioConfig.Builder defaultAudioConfigBuilder = AudioConfig.newBuilder().setAudioEncoding(AudioEncoding.OGG_OPUS);
     private static final AudioConfig defaultAudioConfig = defaultAudioConfigBuilder.build();
 
+    transient private final VoiceSelectionParams.Builder voiceSelectionParamsBuilder;
+    transient private final AudioConfig.Builder audioConfigBuilder;
+    private VoiceSelectionParams voiceSelectionParams;
+    private AudioConfig audioConfig;
+
     public MemberVoiceConfig() {
-        this(defaultVoiceSelectionParams, defaultAudioConfig);
+        this(Optional.of(defaultVoiceSelectionParams), Optional.of(defaultAudioConfig));
     }
 
-    public MemberVoiceConfig(VoiceSelectionParams voiceSelectionParams, AudioConfig audioConfig) {
-        this.voiceSelectionParams = voiceSelectionParams;
-        this.audioConfig = audioConfig;
-        this.voiceSelectionParamsBuilder = defaultVoiceSelectionParamsBuilder.clone();
-        this.audioConfigBuilder = defaultAudioConfigBuilder.clone();
+    public MemberVoiceConfig(final Optional<VoiceSelectionParams> voiceSelectionParamsOptional, final Optional<AudioConfig> audioConfigOptional) {
+        final var voiceSelectionParams = voiceSelectionParamsOptional.orElse(defaultVoiceSelectionParams);
+        final var audioConfig = audioConfigOptional.orElse(defaultAudioConfig);
+
+        this.voiceSelectionParamsBuilder = defaultVoiceSelectionParamsBuilder.clone().mergeFrom(voiceSelectionParams);
+        this.audioConfigBuilder = defaultAudioConfigBuilder.clone().mergeFrom(audioConfig);
+        this.voiceSelectionParams = voiceSelectionParamsBuilder.build();
+        this.audioConfig = audioConfigBuilder.build();
+    }
+
+    public static MemberVoiceConfig unwrapMessageBuffer(final ByteArrayInputStream byteArrayInputStream) throws IOException {
+        final var unpacker = MessagePack.newDefaultUnpacker(byteArrayInputStream);
+        var paramCount = 0;
+
+        Optional<VoiceSelectionParams> voiceSelectionParamsOptional = Optional.empty();
+        Optional<AudioConfig> audioConfigOptional = Optional.empty();
+        var nilReached = false;
+        while (unpacker.hasNext() && !nilReached) {
+            final var format = unpacker.getNextFormat();
+            final var value = unpacker.unpackValue();
+
+            switch (format.getValueType()) {
+                case NIL:
+                    nilReached = true;
+                    break;
+                default:
+                    final var binaryValue = value.asBinaryValue().asByteArray();
+                    switch (paramCount) {
+                        case 0:
+                            voiceSelectionParamsOptional = Optional.of(VoiceSelectionParams.parseFrom(binaryValue));
+                            break;
+                        case 1:
+                            audioConfigOptional = Optional.of(AudioConfig.parseFrom(binaryValue));
+                            break;
+                        default:
+                            throw new IOException("Unexpected data format; abandoning unpack.");
+                    }
+                    paramCount++;
+            }
+        }
+
+        return new MemberVoiceConfig(voiceSelectionParamsOptional, audioConfigOptional);
     }
 
     public VoiceSelectionParams getVoiceSelectionParams() {
         return voiceSelectionParams;
     }
 
-    public void setGenderInVoiceSelectionParams(String gender) {
+    public void setGenderInVoiceSelectionParams(final String gender) {
         Optional<String> genderOptional = Optional.ofNullable(gender);
 
         genderOptional.ifPresent(genderPres -> {
             SsmlVoiceGender ssmlVoiceGender;
             switch (genderPres.toLowerCase(Locale.ENGLISH)) {
-                case "male": ssmlVoiceGender = SsmlVoiceGender.MALE; break;
-                case "female": ssmlVoiceGender = SsmlVoiceGender.FEMALE; break;
-                default: ssmlVoiceGender = SsmlVoiceGender.NEUTRAL; break;
+                case "male":
+                    ssmlVoiceGender = SsmlVoiceGender.MALE;
+                    break;
+                case "female":
+                    ssmlVoiceGender = SsmlVoiceGender.FEMALE;
+                    break;
+                default:
+                    ssmlVoiceGender = SsmlVoiceGender.NEUTRAL;
+                    break;
             }
             voiceSelectionParamsBuilder.setSsmlGender(ssmlVoiceGender);
         });
@@ -81,10 +129,6 @@ public class MemberVoiceConfig {
         rebuildVoiceSelectionParamsBuilder();
     }
 
-    public void setVoiceSelectionParams(VoiceSelectionParams voiceSelectionParams) {
-        this.voiceSelectionParams = voiceSelectionParams;
-    }
-
     public AudioConfig getAudioConfig() {
         return audioConfig;
     }
@@ -100,6 +144,23 @@ public class MemberVoiceConfig {
                         "pitch: %f%n" +
                         "speaking rate: %f",
                 voiceSelectionParams.getSsmlGender().getValueDescriptor(), voiceSelectionParams.getName(), audioConfig.getPitch(), audioConfig.getSpeakingRate());
+    }
+
+    public MessageBuffer toMessageBuffer() throws IOException {
+        rebuildAll();
+
+        final MessageBufferPacker packer = MessagePack.newDefaultBufferPacker();
+        packBinaryMessageBufferData(packer, this.voiceSelectionParams.toByteArray());
+        packBinaryMessageBufferData(packer, this.audioConfig.toByteArray());
+        packer.packNil();
+        packer.close();
+        return packer.toMessageBuffer();
+    }
+
+    private void packBinaryMessageBufferData(final MessageBufferPacker packer,
+                                             final byte[] binary) throws IOException {
+        packer.packBinaryHeader(binary.length);
+        packer.writePayload(binary);
     }
 
 }

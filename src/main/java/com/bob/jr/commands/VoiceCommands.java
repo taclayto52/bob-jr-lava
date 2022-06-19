@@ -152,4 +152,26 @@ public class VoiceCommands {
                 .then();
     }
 
+    public Mono<Void> saveVoice(Intent intent) {
+        final var tts = serverResources.getTextToSpeech();
+        return Mono.justOrEmpty(intent.getMessageCreateEvent())
+                .flatMap(messageCreateEvent -> {
+                    final var messageChannelOptional = messageCreateEvent.getMessage().getChannel().blockOptional();
+                    final var messageChannel = messageChannelOptional.orElseThrow();
+                    messageChannel.type();
+                    if (messageCreateEvent.getMember().isEmpty()) {
+                        return messageChannel.createMessage(String.format("No member found in message event :confused: %n(Get yourself checked)"));
+                    } else {
+                        final var member = messageCreateEvent.getMember().get();
+                        final var storageSuccessful = tts.persistMemberConfigToStorage(member).block();
+                        var storeMessage = String.format("%s Storage %s for %s.",
+                                storageSuccessful ? ":white_check_mark:" : ":x:",
+                                storageSuccessful ? "successful" : "FAILED",
+                                member.getUsername());
+                        return messageChannel.createMessage(storeMessage);
+                    }
+                })
+                .then();
+    }
+
 }
