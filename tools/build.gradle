@@ -1,0 +1,23 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+repositories {   // repositories for Jar's you access in your code
+    mavenCentral()
+    maven {
+        url 'https://m2.dv8tion.net/releases'
+    }
+}
+
+application {
+    mainClass = 'com.bob.jr.ApplicationCommandRegTools'
+}
+
+dependencies {
+    implementation getParent()
+    implementation group: 'com.discord4j', name: 'discord4j-core', version: '3.2.2'
+    implementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
+    implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: '1.7.32'
+    implementation group: 'net.logstash.logback', name: 'logstash-logback-encoder', version: '6.6'
+}

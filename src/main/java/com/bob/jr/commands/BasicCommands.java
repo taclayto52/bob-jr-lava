@@ -1,53 +1,136 @@
 package com.bob.jr.commands;
 
 import com.bob.jr.Intent;
+import com.bob.jr.interfaces.ApplicationCommandInterface;
 import com.bob.jr.utils.ServerResources;
 import discord4j.common.util.Snowflake;
+import discord4j.core.event.domain.interaction.ApplicationCommandInteractionEvent;
 import discord4j.core.object.VoiceState;
+import discord4j.core.object.command.ApplicationCommand;
 import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.channel.VoiceChannel;
+import discord4j.discordjson.json.ApplicationCommandRequest;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.Optional;
+import java.util.*;
 
-public class BasicCommands {
+public class BasicCommands implements CommandRegistrar {
 
     private final ServerResources serverResources;
+    private final CommandStore commandStore;
 
-    public BasicCommands(ServerResources serverResources) {
+    private final Map<String, ApplicationCommandInterface> basicCommandMap = new HashMap<>();
+    private final String JOIN_COMMAND_HOOK = "join";
+    private final String LEAVE_COMMAND_HOOK = "leave";
+    private final String STOP_COMMAND_HOOK = "stop";
+
+    public BasicCommands(ServerResources serverResources, CommandStore commandStore) {
         this.serverResources = serverResources;
+        this.commandStore = commandStore;
+    }
+
+    public Mono<Void> registerJoinCommand() {
+        final ApplicationCommandRequest joinApplicationCommand = ApplicationCommandRequest.builder()
+                .name("join")
+                .type(ApplicationCommand.Type.CHAT_INPUT.getValue())
+                .description("Have the bot join the channel")
+                .build();
+
+        basicCommandMap.put(JOIN_COMMAND_HOOK, this::joinCommand);
+        return commandStore.registerCommand(joinApplicationCommand);
+    }
+
+    public Mono<Void> registerLeaveCommand() {
+        final ApplicationCommandRequest leaveApplicationCommand = ApplicationCommandRequest.builder()
+                .name("leave")
+                .type(ApplicationCommand.Type.CHAT_INPUT.getValue())
+                .description("Have the bot join all channels")
+                .build();
+
+
+        basicCommandMap.put(LEAVE_COMMAND_HOOK, this::leaveCommand);
+        return commandStore.registerCommand(leaveApplicationCommand);
+    }
+
+    public Mono<Void> registerStopCommand() {
+        final ApplicationCommandRequest leaveApplicationCommand = ApplicationCommandRequest.builder()
+                .name("stop")
+                .type(ApplicationCommand.Type.CHAT_INPUT.getValue())
+                .description(String.format("Stop whatever %s is doing", Objects.requireNonNull(serverResources.getGatewayDiscordClient().getSelf().block()).getUsername()))
+                .build();
+
+
+        basicCommandMap.put(STOP_COMMAND_HOOK, this::stopCommand);
+        return commandStore.registerCommand(leaveApplicationCommand);
+    }
+
+    public Mono<Void> joinCommandFunction(Member member) {
+        return member.getVoiceState()
+                .flatMap(VoiceState::getChannel)
+                .flatMap(VoiceChannel::join)
+                .then();
+    }
+
+    // since the operations are functionally the same after we get the member, we should generalize that
+    public Mono<Void> joinCommand(ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
+        return Mono.justOrEmpty(applicationCommandInteractionEvent.getInteraction().getMember().orElseThrow())
+                .flatMap(this::joinCommandFunction)
+                .then(applicationCommandInteractionEvent.reply("joining the channel!"))
+                .then();
     }
 
     public Mono<Void> joinCommand(Intent intent) {
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
-                .flatMap(Member::getVoiceState)
-                .flatMap(VoiceState::getChannel)
-                .flatMap(channel -> channel.join(spec -> spec.setProvider(serverResources.getServerAudioProvider())))
+        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember().orElseThrow())
+                .flatMap(this::joinCommandFunction)
+                .then();
+    }
+
+    public Mono<Void> leaveCommandFunction(Snowflake guildSnowflake) {
+        serverResources.getTrackScheduler().clearPlaylist();
+        Optional<VoiceState> voiceStateOptional = Optional.ofNullable(serverResources.getGatewayDiscordClient().getMemberById(guildSnowflake, serverResources.getGatewayDiscordClient().getSelfId())
+                .block()
+                .getVoiceState()
+                .block());
+        return voiceStateOptional.orElseThrow().getChannel().block()
+                .getVoiceConnection().block()
+                .disconnect().then();
+    }
+
+    public Mono<Void> leaveCommand(ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
+        return Mono.justOrEmpty(applicationCommandInteractionEvent.getInteraction().getGuildId())
+                .flatMap(this::leaveCommandFunction)
+                .then(applicationCommandInteractionEvent.reply("Leaving the channel!"))
                 .then();
     }
 
     public Mono<Void> leaveCommand(Intent intent) {
-        return Mono.justOrEmpty(intent.getMessageCreateEvent())
-                .flatMap(event -> {
-                    serverResources.getTrackScheduler().clearPlaylist();
-
-                    Snowflake guildSnow = event.getGuild().block().getId();
-                    Optional<VoiceState> voiceStateOptional = Optional.ofNullable(serverResources.getGatewayDiscordClient().getMemberById(guildSnow, serverResources.getGatewayDiscordClient().getSelfId())
-                            .block()
-                            .getVoiceState()
-                            .block());
-                    Optional<VoiceChannel> optionalVoiceChannel = voiceStateOptional.stream().findFirst().flatMap(voiceState -> Optional.ofNullable(voiceState.getChannel().block()));
-                    optionalVoiceChannel.ifPresent(voiceChannel -> voiceChannel.getVoiceConnection().block().disconnect().block());
-                    return Mono.empty();
-                })
+        return Mono.justOrEmpty(intent.getMessageCreateEvent().getGuildId())
+                .flatMap(this::leaveCommandFunction)
                 .then();
+    }
+
+    public void stopCommandFunction() {
+        serverResources.getTrackScheduler().clearPlaylist();
+    }
+
+    public Mono<Void> stopCommand(ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
+        stopCommandFunction();
+        return Mono.empty();
     }
 
     // just stop for god's sake
     public Mono<Void> stop(Intent intent) {
-        return Mono.justOrEmpty(serverResources.getAudioPlayer())
-                .doOnNext(thePlayer -> serverResources.getTrackScheduler().clearPlaylist())
-                .then();
+        stopCommandFunction();
+        return Mono.empty();
     }
 
+    public Map<String, ApplicationCommandInterface> getApplicationCommandInterfaces() {
+        return basicCommandMap;
+    }
+
+    @Override
+    public Mono<Void> registerCommands() {
+        return Flux.fromIterable(List.of(registerJoinCommand(), registerLeaveCommand(), registerStopCommand())).blockLast();
+    }
 }
