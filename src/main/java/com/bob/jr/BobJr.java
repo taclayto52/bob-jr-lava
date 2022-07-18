@@ -2,9 +2,8 @@ package com.bob.jr;
 
 import com.bob.jr.TextToSpeech.TextToSpeech;
 import com.bob.jr.channelevents.ChannelWatcher;
-import com.bob.jr.commands.BasicCommands;
-import com.bob.jr.commands.PlayerCommands;
-import com.bob.jr.commands.VoiceCommands;
+import com.bob.jr.commands.*;
+import com.bob.jr.interfaces.ApplicationCommandInterface;
 import com.bob.jr.interfaces.Command;
 import com.bob.jr.interfaces.VoidCommand;
 import com.bob.jr.utils.AudioTrackCache;
@@ -20,15 +19,12 @@ import com.sedmelluq.discord.lavaplayer.track.playback.NonAllocatingAudioFrameBu
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.VoiceStateUpdateEvent;
-import discord4j.core.event.domain.command.ApplicationCommandCreateEvent;
 import discord4j.core.event.domain.interaction.ApplicationCommandInteractionEvent;
 import discord4j.core.event.domain.message.MessageCreateEvent;
 import discord4j.core.object.VoiceState;
-import discord4j.core.object.command.ApplicationCommand;
 import discord4j.core.object.entity.Guild;
 import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.Role;
-import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.voice.AudioProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,12 +37,13 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class BobJr {
 
+    public static final String PROJECT_ID = "937970633558"; // load these from environment var
+    public static final String TOKEN_SECRET_ID = "discord-api-key";
+    public static final String TOKEN_SECRET_VERSION = "1";
     private static final Map<String, Command> commands = new HashMap<>();
+    private static final Map<String, ApplicationCommandInterface> applicationCommands = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(BobJr.class);
     private static final Set<VoidCommand> errorMessages = new HashSet<>();
-    private static final String PROJECT_ID = "937970633558"; // load these from environment var
-    private static final String TOKEN_SECRET_ID = "discord-api-key";
-    private static final String TOKEN_SECRET_VERSION = "1";
     private static String botName;
     private static String botNickName;
     private static ConcurrentHashMap<Guild, List<Role>> botRoles = new ConcurrentHashMap<>();
@@ -109,24 +106,11 @@ public class BobJr {
                         .flatMap(this::handleMessageCreateEvent))
                 .subscribe();
 
-        final ApplicationCommandRequest joinApplicationCommand = ApplicationCommandRequest.builder()
-                .name("join-slash")
-                .type(ApplicationCommand.Type.CHAT_INPUT.getValue())
-                .description("Have the bot join the channel")
-                .build();
-
-        client.getEventDispatcher().on(ApplicationCommandCreateEvent.class)
-                .flatMap(applicationCommandCreateEvent -> {
-                    logger.info(applicationCommandCreateEvent.getCommand().getName() + " created!");
-                    return Mono.empty();
-                })
-                .subscribe();
-
-        client.getRestClient().getApplicationService()
-                .createGlobalApplicationCommand(applicationId.asLong(), joinApplicationCommand)
-                .flatMap(applicationCommandData -> {
-                    logger.info(String.format("Sent request to create application command %s", applicationCommandData.name()));
-                    return Mono.empty();
+        // application command handlers
+        client.getEventDispatcher().on(ApplicationCommandInteractionEvent.class)
+                .flatMap(applicationCommandInteractionEvent -> {
+                    final var applicationCommand = getRegisteredCommandAction(applicationCommandInteractionEvent).orElseThrow();
+                    return applicationCommand.execute(applicationCommandInteractionEvent);
                 })
                 .subscribe();
 
@@ -135,16 +119,6 @@ public class BobJr {
                     logger.info(String.format("Got application command from global reg: %s", applicationCommandData.name()));
                     return Mono.empty();
                 }).subscribe();
-
-        client.getEventDispatcher().on(ApplicationCommandInteractionEvent.class)
-                .flatMap(applicationCommandInteractionEvent -> {
-                    logger.info(String.format("Interaction with %s!", applicationCommandInteractionEvent.getCommandName()));
-                    return Mono.empty();
-                }).subscribe();
-
-
-//        client.getGuilds().flatMap(guild -> {
-//        });
 
         // register member listener
         client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
@@ -181,6 +155,11 @@ public class BobJr {
         return tts;
     }
 
+    public static void logThrowableAndPrintStackTrace(Throwable throwable) {
+        logger.error(String.format("Error: %s", throwable.getMessage()));
+        throwable.printStackTrace();
+    }
+
     public Mono<MessageCreateEvent> maybeGetGuildRoles(MessageCreateEvent messageCreateEvent) {
         final var guild = messageCreateEvent.getGuild().block();
         botRoles.computeIfAbsent(guild, guild1 -> guild1.getSelfMember().block().getRoles().collectList().block());
@@ -196,6 +175,10 @@ public class BobJr {
                     throwable.printStackTrace();
                 })
                 .next();
+    }
+
+    public Optional<ApplicationCommandInterface> getRegisteredCommandAction(ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
+        return Optional.ofNullable(applicationCommands.get(applicationCommandInteractionEvent.getCommandName()));
     }
 
     public ServerResources setupPlayerAndCommands(TextToSpeech tts, GatewayDiscordClient client) {
@@ -219,9 +202,17 @@ public class BobJr {
 
         AudioProvider provider = new LavaPlayerAudioProvider(player, announcementPlayer);
         ServerResources serverResources = new ServerResources(provider, scheduler, client, player, playerManager, tts, audioTrackCache);
-        BasicCommands basicCommands = new BasicCommands(serverResources);
+        CommandStore commandStore = new CommandStore(client);
+        BasicCommands basicCommands = new BasicCommands(serverResources, commandStore);
         PlayerCommands playerCommands = new PlayerCommands(serverResources);
         VoiceCommands voiceCommands = new VoiceCommands(serverResources);
+
+        registerApplicationCommands(List.of(basicCommands))
+                .doOnError(BobJr::logThrowableAndPrintStackTrace)
+                .block();
+
+        // register application commands
+        applicationCommands.putAll(basicCommands.getApplicationCommandInterfaces());
 
         // basic commands
         commands.put("join", basicCommands::joinCommand);
@@ -254,6 +245,10 @@ public class BobJr {
         commands.put("tts", voiceCommands::tts);
 
         return serverResources;
+    }
+
+    private Mono<Void> registerApplicationCommands(List<CommandRegistrar> commandRegistrars) {
+        return Flux.fromIterable(commandRegistrars).flatMap(CommandRegistrar::registerCommands).next();
     }
 
     public Intent extractIntent(String incomingMessage, MessageCreateEvent event) {
