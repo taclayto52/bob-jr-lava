@@ -156,11 +156,12 @@ public class VoiceCommands {
         final var tts = serverResources.getTextToSpeech();
         return Mono.justOrEmpty(intent.getMessageCreateEvent())
                 .flatMap(messageCreateEvent -> {
-                    final var messageChannelOptional = messageCreateEvent.getMessage().getChannel().blockOptional();
-                    final var messageChannel = messageChannelOptional.orElseThrow();
+                    final var messageChannel = messageCreateEvent.getMessage().getChannel().blockOptional()
+                            .orElseThrow();
+
                     messageChannel.type();
                     if (messageCreateEvent.getMember().isEmpty()) {
-                        return messageChannel.createMessage(String.format("No member found in message event :confused: %n(Get yourself checked)"));
+                        return messageChannel.createMessage(String.format("No member found in message event :confused: %n"));
                     } else {
                         final var member = messageCreateEvent.getMember().get();
                         final var storageSuccessful = tts.persistMemberConfigToStorage(member).block();
