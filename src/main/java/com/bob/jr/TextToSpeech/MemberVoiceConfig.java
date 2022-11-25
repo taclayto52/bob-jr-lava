@@ -7,6 +7,9 @@ import com.google.cloud.texttospeech.v1.VoiceSelectionParams;
 import org.msgpack.core.MessageBufferPacker;
 import org.msgpack.core.MessagePack;
 import org.msgpack.core.buffer.MessageBuffer;
+import org.msgpack.value.ValueType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -15,6 +18,7 @@ import java.util.Optional;
 
 public class MemberVoiceConfig {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(MemberVoiceConfig.class);
     private static final String defaultVoiceString = "en-US-Standard-A";
     private static final VoiceSelectionParams.Builder defaultVoiceSelectionParamsBuilder = VoiceSelectionParams.newBuilder()
             .setLanguageCode("en-us")
@@ -54,23 +58,16 @@ public class MemberVoiceConfig {
             final var format = unpacker.getNextFormat();
             final var value = unpacker.unpackValue();
 
-            switch (format.getValueType()) {
-                case NIL:
-                    nilReached = true;
-                    break;
-                default:
-                    final var binaryValue = value.asBinaryValue().asByteArray();
-                    switch (paramCount) {
-                        case 0:
-                            voiceSelectionParamsOptional = Optional.of(VoiceSelectionParams.parseFrom(binaryValue));
-                            break;
-                        case 1:
-                            audioConfigOptional = Optional.of(AudioConfig.parseFrom(binaryValue));
-                            break;
-                        default:
-                            throw new IOException("Unexpected data format; abandoning unpack.");
-                    }
-                    paramCount++;
+            if (format.getValueType() == ValueType.NIL) {
+                nilReached = true;
+            } else {
+                final var binaryValue = value.asBinaryValue().asByteArray();
+                switch (paramCount) {
+                    case 0 -> voiceSelectionParamsOptional = Optional.of(VoiceSelectionParams.parseFrom(binaryValue));
+                    case 1 -> audioConfigOptional = Optional.of(AudioConfig.parseFrom(binaryValue));
+                    default -> throw new IOException("Unexpected data format; abandoning unpack.");
+                }
+                paramCount++;
             }
         }
 
@@ -152,15 +149,28 @@ public class MemberVoiceConfig {
         final MessageBufferPacker packer = MessagePack.newDefaultBufferPacker();
         packBinaryMessageBufferData(packer, this.voiceSelectionParams.toByteArray());
         packBinaryMessageBufferData(packer, this.audioConfig.toByteArray());
-        packer.packNil();
-        packer.close();
+        try {
+            packer.packNil();
+            packer.close();
+        } catch (IOException ioException) {
+            LOGGER.error(String.format("Error writing message buffer %s", ioException.getMessage()));
+            // throwing to bubble error back up to user
+            throw ioException;
+        }
         return packer.toMessageBuffer();
     }
 
     private void packBinaryMessageBufferData(final MessageBufferPacker packer,
                                              final byte[] binary) throws IOException {
-        packer.packBinaryHeader(binary.length);
-        packer.writePayload(binary);
+        try {
+            packer.packBinaryHeader(binary.length);
+            packer.writePayload(binary);
+        } catch (IOException ioException) {
+            LOGGER.error(String.format("Error writing message buffer %s", ioException.getMessage()));
+            // throwing to bubble error back up to user
+            throw ioException;
+        }
+
     }
 
 }
