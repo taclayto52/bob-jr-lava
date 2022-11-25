@@ -33,10 +33,9 @@ public class TextToSpeech {
     public TextToSpeech(Optional<Storage> gStorageOptional) throws IOException {
         textToSpeechClient = TextToSpeechClient.create();
         this.gStorageOptional = gStorageOptional;
-        retrieveVoiceSettingsFromStorage(gStorageOptional);
     }
 
-    private void retrieveVoiceSettingsFromStorage(Optional<Storage> gStorageOptional) {
+    public void retrieveVoiceSettingsFromStorage() {
         final var loadFromStorage = true;
         if (gStorageOptional.isPresent()) {
             if (!loadFromStorage) {

@@ -135,6 +135,7 @@ public class BobJr {
         TextToSpeech tts = null;
         try {
             tts = new TextToSpeech(Optional.of(gStorage));
+            tts.retrieveVoiceSettingsFromStorage();
         } catch (IOException ioe) {
             logger.error(ioe.getMessage());
         }
