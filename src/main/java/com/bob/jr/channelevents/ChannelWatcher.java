@@ -38,7 +38,7 @@ public class ChannelWatcher {
         if (member.isBot()) {
             return Mono.empty();
         }
-        if (voiceStateUpdateEvent.isJoinEvent() && testSoundClipLoad && memberDisplayName.toLowerCase(Locale.ROOT).contains("ilovedogs")) {
+        if (voiceStateUpdateEvent.isJoinEvent() && testSoundClipLoad && memberDisplayName.toLowerCase(Locale.ROOT).contains("vsepr")) {
             String loadClipString = "https://www.youtube.com/watch?v=LfwJJ6s66GE";
 
             final var randomStartTime = new Random().nextInt(80);
