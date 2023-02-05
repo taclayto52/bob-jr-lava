@@ -44,9 +44,9 @@ public class BobJr {
     private static final Map<String, ApplicationCommandInterface> applicationCommands = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(BobJr.class);
     private static final Set<VoidCommand> errorMessages = new HashSet<>();
+    private static final ConcurrentHashMap<Guild, List<Role>> botRoles = new ConcurrentHashMap<>();
     private static String botName;
     private static String botNickName;
-    private static ConcurrentHashMap<Guild, List<Role>> botRoles = new ConcurrentHashMap<>();
 
     static {
         commands.put("ping", intent -> intent.getMessageCreateEvent().getMessage()
@@ -57,22 +57,22 @@ public class BobJr {
 
     private final HeartBeats heartBeats;
 
-    public BobJr(Optional<String> token) {
+    public BobJr(final Optional<String> token) {
         // setup GCloud text to speech
-        TextToSpeech tts = setupTextToSpeech();
+        final TextToSpeech tts = setupTextToSpeech();
 
         // try to get secret
         String secretToken = null;
         if (token.isEmpty()) {
             try {
-                SecretManagerServiceClient secretClient = SecretManagerServiceClient.create();
+                final SecretManagerServiceClient secretClient = SecretManagerServiceClient.create();
                 final AccessSecretVersionResponse response = secretClient.accessSecretVersion(SecretVersionName.newBuilder()
                         .setProject(PROJECT_ID)
                         .setSecret(TOKEN_SECRET_ID)
                         .setSecretVersion(TOKEN_SECRET_VERSION)
                         .build());
                 secretToken = response.getPayload().getData().toStringUtf8();
-            } catch (IOException e) {
+            } catch (final IOException e) {
                 e.printStackTrace();
             }
         }
@@ -83,8 +83,8 @@ public class BobJr {
                 .login()
                 .block();
         botName = client.getSelf().block().getMention();
-        StringBuffer nickNameBuffer = new StringBuffer(botName);
-        int indexOfAt = nickNameBuffer.indexOf("@");
+        final StringBuffer nickNameBuffer = new StringBuffer(botName);
+        final int indexOfAt = nickNameBuffer.indexOf("@");
         botNickName = nickNameBuffer.replace(indexOfAt, indexOfAt + 1, "@!").toString();
 
         // get application id
@@ -92,10 +92,10 @@ public class BobJr {
 
 
         // setup commands
-        ServerResources serverResources = setupPlayerAndCommands(tts, client);
+        final ServerResources serverResources = setupPlayerAndCommands(tts, client);
 
         // setup Channel Watcher
-        ChannelWatcher channelWatcher = new ChannelWatcher(serverResources);
+        final ChannelWatcher channelWatcher = new ChannelWatcher(serverResources);
 
         // register events
         client.getEventDispatcher().on(MessageCreateEvent.class)
@@ -140,8 +140,8 @@ public class BobJr {
         heartBeats.stopAsync();
     }
 
-    public static void main(String[] args) {
-        Optional<String> optionalSecret = args.length > 0 ? Optional.ofNullable(args[0]) : Optional.empty();
+    public static void main(final String[] args) {
+        final Optional<String> optionalSecret = args.length > 0 ? Optional.ofNullable(args[0]) : Optional.empty();
         new BobJr(optionalSecret);
     }
 
@@ -149,24 +149,24 @@ public class BobJr {
         TextToSpeech tts = null;
         try {
             tts = new TextToSpeech();
-        } catch (IOException ioe) {
+        } catch (final IOException ioe) {
             logger.error(ioe.getMessage());
         }
         return tts;
     }
 
-    public static void logThrowableAndPrintStackTrace(Throwable throwable) {
+    public static void logThrowableAndPrintStackTrace(final Throwable throwable) {
         logger.error(String.format("Error: %s", throwable.getMessage()));
         throwable.printStackTrace();
     }
 
-    public Mono<MessageCreateEvent> maybeGetGuildRoles(MessageCreateEvent messageCreateEvent) {
+    public Mono<MessageCreateEvent> maybeGetGuildRoles(final MessageCreateEvent messageCreateEvent) {
         final var guild = messageCreateEvent.getGuild().block();
         botRoles.computeIfAbsent(guild, guild1 -> guild1.getSelfMember().block().getRoles().collectList().block());
         return Mono.just(messageCreateEvent);
     }
 
-    public Mono<Void> handleMessageCreateEvent(Intent intent) {
+    public Mono<Void> handleMessageCreateEvent(final Intent intent) {
         return Flux.fromIterable(commands.entrySet())
                 .filter(entry -> intent.getIntentName().equals(entry.getKey()))
                 .flatMap(entry -> entry.getValue().execute(intent))
@@ -177,11 +177,11 @@ public class BobJr {
                 .next();
     }
 
-    public Optional<ApplicationCommandInterface> getRegisteredCommandAction(ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
+    public Optional<ApplicationCommandInterface> getRegisteredCommandAction(final ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
         return Optional.ofNullable(applicationCommands.get(applicationCommandInteractionEvent.getCommandName()));
     }
 
-    public ServerResources setupPlayerAndCommands(TextToSpeech tts, GatewayDiscordClient client) {
+    public ServerResources setupPlayerAndCommands(final TextToSpeech tts, final GatewayDiscordClient client) {
         // setup audio player
         final AudioPlayerManager playerManager = new DefaultAudioPlayerManager();
         playerManager.getConfiguration().setFrameBufferFactory(NonAllocatingAudioFrameBuffer::new);
@@ -200,12 +200,12 @@ public class BobJr {
         // create scheduler
         final TrackScheduler scheduler = new TrackScheduler(player, announcementPlayer, audioTrackCache);
 
-        AudioProvider provider = new LavaPlayerAudioProvider(player, announcementPlayer);
-        ServerResources serverResources = new ServerResources(provider, scheduler, client, player, playerManager, tts, audioTrackCache);
-        CommandStore commandStore = new CommandStore(client);
-        BasicCommands basicCommands = new BasicCommands(serverResources, commandStore);
-        PlayerCommands playerCommands = new PlayerCommands(serverResources);
-        VoiceCommands voiceCommands = new VoiceCommands(serverResources);
+        final AudioProvider provider = new LavaPlayerAudioProvider(player, announcementPlayer);
+        final ServerResources serverResources = new ServerResources(provider, scheduler, client, player, playerManager, tts, audioTrackCache);
+        final CommandStore commandStore = new CommandStore(client);
+        final BasicCommands basicCommands = new BasicCommands(serverResources, commandStore);
+        final PlayerCommands playerCommands = new PlayerCommands(serverResources, commandStore);
+        final VoiceCommands voiceCommands = new VoiceCommands(serverResources);
 
         registerApplicationCommands(List.of(basicCommands))
                 .doOnError(BobJr::logThrowableAndPrintStackTrace)
@@ -221,8 +221,8 @@ public class BobJr {
         commands.put("stop", basicCommands::stop);
 
         // player commands
-        commands.put("play", playerCommands::play);
-        commands.put("search", playerCommands::search);
+        commands.put("play", playerCommands::playCommand);
+        commands.put("search", playerCommands::searchCommand);
         commands.put("playlist", playerCommands::playlist);
         commands.put("volume", playerCommands::setVolume);
 
@@ -247,31 +247,31 @@ public class BobJr {
         return serverResources;
     }
 
-    private Mono<Void> registerApplicationCommands(List<CommandRegistrar> commandRegistrars) {
+    private Mono<Void> registerApplicationCommands(final List<CommandRegistrar> commandRegistrars) {
         return Flux.fromIterable(commandRegistrars).flatMap(CommandRegistrar::registerCommands).next();
     }
 
-    public Intent extractIntent(String incomingMessage, MessageCreateEvent event) {
+    public Intent extractIntent(final String incomingMessage, final MessageCreateEvent event) {
         String containedBotName = checkAndReturnBotName(incomingMessage, event);
         if (containedBotName == null) {
             return null;
         }
 
-        StringBuffer stringBuffer = new StringBuffer(incomingMessage);
+        final StringBuffer stringBuffer = new StringBuffer(incomingMessage);
         int botNameStartIndex = stringBuffer.indexOf(containedBotName);
 
         while (botNameStartIndex > -1) {
-            int botNameEndIndex = botNameStartIndex + containedBotName.length();
+            final int botNameEndIndex = botNameStartIndex + containedBotName.length();
             stringBuffer.replace(botNameStartIndex, botNameEndIndex, "");
 
             containedBotName = checkAndReturnBotName(incomingMessage, event);
             botNameStartIndex = stringBuffer.indexOf(containedBotName);
         }
 
-        String trimmedMessage = stringBuffer.toString().trim();
-        int firstSpace = trimmedMessage.indexOf(" ");
-        String intentName;
-        String intentContext;
+        final String trimmedMessage = stringBuffer.toString().trim();
+        final int firstSpace = trimmedMessage.indexOf(" ");
+        final String intentName;
+        final String intentContext;
         if (firstSpace > -1) {
             intentName = trimmedMessage.substring(0, firstSpace).toLowerCase(Locale.ENGLISH);
             intentContext = trimmedMessage.substring(firstSpace + 1);
@@ -285,7 +285,7 @@ public class BobJr {
         return new Intent(intentName, intentContext, event);
     }
 
-    private String checkAndReturnBotName(String message, MessageCreateEvent event) {
+    private String checkAndReturnBotName(final String message, final MessageCreateEvent event) {
         if (message.contains(botName)) {
             return botName;
         } else if (message.contains(botNickName)) {
@@ -294,7 +294,7 @@ public class BobJr {
             final var roleSet = botRoles.get(event.getGuild().block());
             final var roleSetIterator = roleSet.iterator();
             while (roleSetIterator.hasNext()) {
-                var role = roleSetIterator.next();
+                final var role = roleSetIterator.next();
                 if (message.contains(role.getMention())) {
                     return role.getMention();
                 }
