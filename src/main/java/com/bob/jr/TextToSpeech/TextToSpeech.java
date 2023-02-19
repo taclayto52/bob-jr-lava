@@ -22,55 +22,55 @@ public class TextToSpeech {
         textToSpeechClient = TextToSpeechClient.create();
     }
 
-    public Mono<String> synthesizeTextMono(Member member, String text) {
+    public Mono<String> synthesizeTextMono(final Member member, final String text) {
         return Mono.just(synthesizeText(member, text));
     }
 
-    public String synthesizeText(String text) {
+    public String synthesizeText(final String text) {
         return synthesizeText(null, text);
     }
 
-    public String synthesizeText(Member member, String text) {
-        MemberVoiceConfig memberVoiceConfig = member != null ? getMemberVoice(member) : new MemberVoiceConfig();
+    public String synthesizeText(final Member member, final String text) {
+        final MemberVoiceConfig memberVoiceConfig = member != null ? getMemberVoice(member) : new MemberVoiceConfig();
 
-        SynthesisInput input = SynthesisInput.newBuilder().setText(text).build();
-        VoiceSelectionParams voice = memberVoiceConfig.getVoiceSelectionParams();
-        AudioConfig audioConfig = memberVoiceConfig.getAudioConfig();
+        final SynthesisInput input = SynthesisInput.newBuilder().setText(text).build();
+        final VoiceSelectionParams voice = memberVoiceConfig.getVoiceSelectionParams();
+        final AudioConfig audioConfig = memberVoiceConfig.getAudioConfig();
 
-        SynthesizeSpeechResponse response = textToSpeechClient.synthesizeSpeech(input, voice, audioConfig);
+        final SynthesizeSpeechResponse response = textToSpeechClient.synthesizeSpeech(input, voice, audioConfig);
 
-        ByteString audioContents = response.getAudioContent();
+        final ByteString audioContents = response.getAudioContent();
 
         if (response.getAudioContent().isEmpty()) {
-            return this.getClass().getClassLoader().getResource("oom.opus").getFile();
+            return this.getClass().getClassLoader().getResource("soundFiles/oom.opus").getFile();
         }
 
-        OutputStream out;
+        final OutputStream out;
         String fileLocation = null;
         try {
-            File file = new File("output.opus");
+            final File file = new File("output.opus");
             fileLocation = file.getPath();
             out = new FileOutputStream(file);
             out.write(audioContents.toByteArray());
             System.out.println("Audio content written to file \"output.opus\"");
-        } catch (FileNotFoundException e) {
+        } catch (final FileNotFoundException e) {
             e.printStackTrace();
-        } catch (IOException e) {
+        } catch (final IOException e) {
             e.printStackTrace();
         }
 
         if (fileLocation.isEmpty()) {
-            fileLocation = this.getClass().getClassLoader().getResource("ERROR.opus").getFile();
+            fileLocation = this.getClass().getClassLoader().getResource("soundFiles/ERROR.opus").getFile();
         }
 
         return fileLocation;
     }
 
-    public String getListOfVoices(String language) {
-        String finalLanguage = Optional.ofNullable(language).orElse("en-us");
+    public String getListOfVoices(final String language) {
+        final String finalLanguage = Optional.ofNullable(language).orElse("en-us");
 
         logger.info(String.format("getting list of voices for language: %s", finalLanguage));
-        ListVoicesResponse listVoicesResponse = textToSpeechClient.listVoices(finalLanguage);
+        final ListVoicesResponse listVoicesResponse = textToSpeechClient.listVoices(finalLanguage);
         return listVoicesResponse.getVoicesList()
                 .stream()
                 .map(Voice::getName)
@@ -78,8 +78,8 @@ public class TextToSpeech {
 
     }
 
-    public MemberVoiceConfig setMemberVoiceConfig(Member member, String gender, String voiceName, Double pitch, Double speakingRate) {
-        MemberVoiceConfig memberVoiceConfig = getMemberVoice(member);
+    public MemberVoiceConfig setMemberVoiceConfig(final Member member, final String gender, final String voiceName, final Double pitch, final Double speakingRate) {
+        final MemberVoiceConfig memberVoiceConfig = getMemberVoice(member);
         memberVoiceConfig.setGenderInVoiceSelectionParams(gender);
         memberVoiceConfig.setVoiceNameInVoiceSelectionParams(voiceName);
         memberVoiceConfig.setPitchInAudioConfigBuilder(pitch);
@@ -89,12 +89,12 @@ public class TextToSpeech {
         return memberVoiceConfig;
     }
 
-    public MemberVoiceConfig getMemberVoice(Member member) {
-        Optional<MemberVoiceConfig> optionalMemberVoiceConfig = Optional.ofNullable(memberVoiceMap.putIfAbsent(member, new MemberVoiceConfig()));
+    public MemberVoiceConfig getMemberVoice(final Member member) {
+        final Optional<MemberVoiceConfig> optionalMemberVoiceConfig = Optional.ofNullable(memberVoiceMap.putIfAbsent(member, new MemberVoiceConfig()));
         return optionalMemberVoiceConfig.orElse(memberVoiceMap.get(member));
     }
 
-    public String getMemberVoiceString(Member member) {
+    public String getMemberVoiceString(final Member member) {
         return getMemberVoice(member).toString();
     }
 

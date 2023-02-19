@@ -1,11 +1,14 @@
 package com.bob.jr.commands;
 
 import com.bob.jr.Intent;
+import com.bob.jr.channelevents.ChannelWatcher;
 import com.bob.jr.utils.ServerResources;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import discord4j.core.object.VoiceState;
 import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.Message;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -17,17 +20,18 @@ import static com.bob.jr.utils.LimitsHelper.PLAYLIST_RETURN_LIMIT;
 public class PlayerCommands {
 
     private final ServerResources serverResources;
+    private final Logger logger = LoggerFactory.getLogger(PlayerCommands.class.getName());
 
-    public PlayerCommands(ServerResources serverResources) {
+    public PlayerCommands(final ServerResources serverResources) {
         this.serverResources = serverResources;
     }
 
-    public Mono<Void> setVolume(Intent intent) {
+    public Mono<Void> setVolume(final Intent intent) {
         return Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
                 .flatMap(Message::getChannel)
                 .doOnSuccess(messageChannel -> {
                     var volume = -1; // -1 to indicate never set
-                    String intentContext = intent.getIntentContext();
+                    final String intentContext = intent.getIntentContext();
                     if (intentContext != null) {
                         volume = Integer.parseInt(intentContext.split(" ")[0]);
                     }
@@ -43,7 +47,7 @@ public class PlayerCommands {
                 .then();
     }
 
-    public Mono<Void> play(Intent intent) {
+    public Mono<Void> play(final Intent intent) {
         return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
                 .flatMap(Member::getVoiceState)
                 .flatMap(VoiceState::getChannel)
@@ -52,7 +56,7 @@ public class PlayerCommands {
                 .then();
     }
 
-    public Mono<Void> search(Intent intent) {
+    public Mono<Void> search(final Intent intent) {
         return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
                 .flatMap(Member::getVoiceState)
                 .flatMap(VoiceState::getChannel)
@@ -61,14 +65,29 @@ public class PlayerCommands {
                 .then();
     }
 
-    public Mono<Void> playlist(Intent intent) {
+    public Mono<Void> playAnnouncementTrack(final Intent intent) {
+        final var splitIntent = intent.getIntentContext().trim().split(" ");
+        var trackStartTime = -1;
+        if (splitIntent.length == 2) {
+            try {
+                trackStartTime = Integer.parseInt(splitIntent[1]);
+            } catch (final NumberFormatException nfe) {
+                logger.error(String.format("bad track start time provided: %s", splitIntent[1]));
+            }
+        }
+        final var announcementUrl = splitIntent[0];
+        ChannelWatcher.playAnnouncementTrack(announcementUrl, trackStartTime, serverResources);
+        return Mono.empty();
+    }
+
+    public Mono<Void> playlist(final Intent intent) {
         final var scheduler = serverResources.getTrackScheduler();
         final var player = serverResources.getAudioPlayer();
         return Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
                 .flatMap(Message::getChannel)
                 .flatMap(messageChannel -> {
-                    List<AudioTrack> audioTrackList = scheduler.getAudioTracks();
-                    StringBuilder printString = new StringBuilder();
+                    final List<AudioTrack> audioTrackList = scheduler.getAudioTracks();
+                    final StringBuilder printString = new StringBuilder();
                     if (audioTrackList.isEmpty() && Optional.ofNullable(player.getPlayingTrack()).isEmpty()) {
                         printString.append(":no_mouth: No playlist currently set");
                     } else {
@@ -76,7 +95,7 @@ public class PlayerCommands {
                             printString.append(String.format(":loud_sound: **Currently playing:** %s%n", player.getPlayingTrack().getInfo().title));
                         }
                         for (int i = 0; i < audioTrackList.size(); i++) {
-                            String appendString = String.format("%d: %s%n", i + 1, audioTrackList.get(i).getInfo().title);
+                            final String appendString = String.format("%d: %s%n", i + 1, audioTrackList.get(i).getInfo().title);
                             if (printString.length() + appendString.length() + 20 >= MESSAGE_LIMIT
                                     || i == PLAYLIST_RETURN_LIMIT) {
                                 printString.append(String.format("And %d more...", audioTrackList.size() - i));
