@@ -54,8 +54,11 @@ public class TrackScheduler implements AudioLoadResultHandler {
     public void trackLoaded(final AudioTrack track) {
         handleTrackCache(track);
         synchronized (announcementTracks) {
-            if (announcementTracks.containsKey(track.getInfo().uri)) {
-                final AnnouncementTrack announcementTrack = announcementTracks.get(track.getInfo().uri);
+            final var announcementTrackKey = announcementTracks.keySet().stream()
+                    .filter(announcementKey -> announcementKey.contains(track.getIdentifier()))
+                    .findAny();
+            if (announcementTrackKey.isPresent()) {
+                final AnnouncementTrack announcementTrack = announcementTracks.get(announcementTrackKey.get());
 
                 // handle upcoming announcement
                 track.setPosition(Math.round(announcementTrack.getStartTime() * 1000));

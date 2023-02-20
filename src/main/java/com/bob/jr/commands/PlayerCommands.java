@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import static com.bob.jr.utils.LimitsHelper.MESSAGE_LIMIT;
@@ -52,7 +53,10 @@ public class PlayerCommands {
                 .flatMap(Member::getVoiceState)
                 .flatMap(VoiceState::getChannel)
                 .flatMap(channel -> channel.join(spec -> spec.setProvider(serverResources.getServerAudioProvider())))
-                .doOnSuccess(voided -> serverResources.getAudioPlayerManager().loadItem(intent.getIntentContext(), serverResources.getTrackScheduler()))
+                .doOnSuccess(voided -> {
+                    final var context = checkAndHandleFile(intent.getIntentContext());
+                    serverResources.getAudioPlayerManager().loadItem(context, serverResources.getTrackScheduler());
+                })
                 .then();
     }
 
@@ -75,8 +79,8 @@ public class PlayerCommands {
                 logger.error(String.format("bad track start time provided: %s", splitIntent[1]));
             }
         }
-        final var announcementUrl = splitIntent[0];
-        ChannelWatcher.playAnnouncementTrack(announcementUrl, trackStartTime, serverResources);
+        final var context = checkAndHandleFile(splitIntent[0]);
+        ChannelWatcher.playAnnouncementTrack(context, trackStartTime, serverResources);
         return Mono.empty();
     }
 
@@ -110,4 +114,14 @@ public class PlayerCommands {
                 .then();
     }
 
+
+    private String checkAndHandleFile(final String intentContext) {
+        if (intentContext.startsWith("file:")) {
+            final var fileLocation = intentContext.split("file:");
+            final var resource = getClass().getClassLoader().getResource("soundFiles/" + fileLocation[1]);
+            return resource == null ? Objects.requireNonNull(getClass().getClassLoader().getResource("soundFiles/ERROR.opus")).getFile() : resource.getFile();
+        } else {
+            return intentContext;
+        }
+    }
 }
