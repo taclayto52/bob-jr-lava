@@ -118,8 +118,8 @@ public class PlayerCommands {
     private String checkAndHandleFile(final String intentContext) {
         if (intentContext.startsWith("file:")) {
             final var fileLocation = intentContext.split("file:");
-            final var resource = getClass().getClassLoader().getResource("soundFiles/" + fileLocation[1]);
-            return resource == null ? Objects.requireNonNull(getClass().getClassLoader().getResource("soundFiles/ERROR.opus")).getFile() : resource.getFile();
+            final var resource = getClass().getClassLoader().getResource("/soundFiles/" + fileLocation[1]);
+            return resource == null ? Objects.requireNonNull(getClass().getClassLoader().getResource("/soundFiles/ERROR.opus")).getFile() : resource.getFile();
         } else {
             return intentContext;
         }

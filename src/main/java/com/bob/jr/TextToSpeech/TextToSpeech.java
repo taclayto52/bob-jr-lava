@@ -42,7 +42,7 @@ public class TextToSpeech {
         final ByteString audioContents = response.getAudioContent();
 
         if (response.getAudioContent().isEmpty()) {
-            return this.getClass().getClassLoader().getResource("soundFiles/oom.opus").getFile();
+            return this.getClass().getClassLoader().getResource("/soundFiles/oom.opus").getFile();
         }
 
         final OutputStream out;
@@ -60,7 +60,7 @@ public class TextToSpeech {
         }
 
         if (fileLocation.isEmpty()) {
-            fileLocation = this.getClass().getClassLoader().getResource("soundFiles/ERROR.opus").getFile();
+            fileLocation = this.getClass().getClassLoader().getResource("/soundFiles/ERROR.opus").getFile();
         }
 
         return fileLocation;
