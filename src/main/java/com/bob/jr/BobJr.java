@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,13 +57,13 @@ public class BobJr {
 
     private final HeartBeats heartBeats;
 
-    public BobJr(final Optional<String> token) {
+    public BobJr(@Nullable final String token) {
         // setup GCloud text to speech
         final TextToSpeech tts = setupTextToSpeech();
 
         // try to get secret
         String secretToken = null;
-        if (token.isEmpty()) {
+        if (token == null) {
             try {
                 final SecretManagerServiceClient secretClient = SecretManagerServiceClient.create();
                 final AccessSecretVersionResponse response = secretClient.accessSecretVersion(SecretVersionName.newBuilder()
@@ -77,7 +78,7 @@ public class BobJr {
         }
 
         // setup client
-        final String tokenProvided = token.orElse(secretToken);
+        final String tokenProvided = secretToken == null ? token : secretToken;
         final GatewayDiscordClient client = DiscordClientBuilder.create(tokenProvided).build()
                 .login()
                 .block();
@@ -117,8 +118,11 @@ public class BobJr {
     }
 
     public static void main(final String[] args) {
-        final Optional<String> optionalSecret = args.length > 0 ? Optional.ofNullable(args[0]) : Optional.empty();
-        new BobJr(optionalSecret);
+        final Optional<String> optionalSecret = args.length > 0 ?
+                Optional.ofNullable(args[0]) :
+                Optional.ofNullable(System.getenv("BOB_JR_DISCORD_AUTH_KEY"));
+
+        new BobJr(optionalSecret.orElse(null));
     }
 
     public static TextToSpeech setupTextToSpeech() {

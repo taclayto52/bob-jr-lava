@@ -54,6 +54,9 @@ dependencies {
 
 shadowJar {
     mergeServiceFiles()
+
+    // add sound files via the Dockerfile process
+    exclude "/soundFiles/*"
 }
 
 test {

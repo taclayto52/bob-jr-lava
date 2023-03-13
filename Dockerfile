@@ -3,6 +3,9 @@ FROM debian:stable-20211220
 ARG PROJECT_VERSION
 ARG DATA_DOG_API_KEY
 ADD build/libs/bob-jr-lava-${PROJECT_VERSION}-all.jar /opt/bob-jr/bob-jr-lava-all.jar
+ADD build/resources/main/soundFiles/*.webm /opt/bob-jr/soundFiles/
+ADD build/resources/main/soundFiles/*.opus /opt/bob-jr/soundFiles/
+ADD build/resources/main/soundFiles/percussion/*.mp3 /opt/bob-jr/soundFiles/
 
 # install openJDK 14
 RUN apt-get update

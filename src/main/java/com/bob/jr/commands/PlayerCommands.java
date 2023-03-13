@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 import static com.bob.jr.utils.LimitsHelper.MESSAGE_LIMIT;
@@ -116,12 +115,19 @@ public class PlayerCommands {
 
 
     private String checkAndHandleFile(final String intentContext) {
+        var resourceLocation = intentContext;
         if (intentContext.startsWith("file:")) {
             final var fileLocation = intentContext.split("file:");
-            final var resource = getClass().getClassLoader().getResource("/soundFiles/" + fileLocation[1]);
-            return resource == null ? Objects.requireNonNull(getClass().getClassLoader().getResource("/soundFiles/ERROR.opus")).getFile() : resource.getFile();
-        } else {
-            return intentContext;
+            final var resource = getClass().getClassLoader().getResource("soundFiles/" + fileLocation[1]);
+            if (resource != null) {
+                // file found in classpath
+                resourceLocation = resource.getFile();
+            } else {
+                // assume we're running in the docker container
+                resourceLocation = "/opt/bob-jr/soundFiles/" + fileLocation[1];
+            }
         }
+
+        return resourceLocation;
     }
 }
