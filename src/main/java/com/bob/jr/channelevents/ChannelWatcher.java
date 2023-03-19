@@ -39,7 +39,7 @@ public class ChannelWatcher {
             return Mono.empty();
         }
         if (voiceStateUpdateEvent.isJoinEvent() && testSoundClipLoad && memberDisplayName.toLowerCase(Locale.ROOT).contains("vsepr")) {
-            final String loadClipString = getClass().getResource("/soundFiles/Bimpson.webm").getFile();
+            final String loadClipString = serverResources.handleFile("Bimpson.webm");
             playAnnouncementTrack(loadClipString, -1, serverResources);
             monoVoid = Mono.empty();
         } else {

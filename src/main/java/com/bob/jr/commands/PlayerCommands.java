@@ -118,14 +118,7 @@ public class PlayerCommands {
         var resourceLocation = intentContext;
         if (intentContext.startsWith("file:")) {
             final var fileLocation = intentContext.split("file:");
-            final var resource = getClass().getClassLoader().getResource("soundFiles/" + fileLocation[1]);
-            if (resource != null) {
-                // file found in classpath
-                resourceLocation = resource.getFile();
-            } else {
-                // assume we're running in the docker container
-                resourceLocation = "/opt/bob-jr/soundFiles/" + fileLocation[1];
-            }
+            resourceLocation = serverResources.handleFile(fileLocation[1]);
         }
 
         return resourceLocation;
