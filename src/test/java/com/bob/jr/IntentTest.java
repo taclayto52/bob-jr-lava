@@ -1,6 +1,5 @@
 package com.bob.jr;
 
-import com.bob.jr.Intent;
 import discord4j.core.event.domain.message.MessageCreateEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
