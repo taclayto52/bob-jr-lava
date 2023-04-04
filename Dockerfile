@@ -1,5 +1,4 @@
-# Example of custom Java runtime using jlink in a multi-stage container build
-FROM eclipse-temurin:17 as jre-build
+FROM eclipse-temurin:17
 
 ARG PROJECT_VERSION
 ARG DATA_DOG_API_KEY
