@@ -28,7 +28,7 @@ public class TrackScheduler implements AudioLoadResultHandler {
     private final ConcurrentHashMap<String, AnnouncementTrack> announcementTracks = new ConcurrentHashMap<>();
     private final AudioTrackCache audioTrackCache;
 
-    private AtomicBoolean isNextTrackAnnouncement = new AtomicBoolean(false);
+    private final AtomicBoolean isNextTrackAnnouncement = new AtomicBoolean(false);
 
     @Deprecated
     public TrackScheduler(final AudioPlayer player) {
@@ -54,18 +54,21 @@ public class TrackScheduler implements AudioLoadResultHandler {
     public void trackLoaded(final AudioTrack track) {
         handleTrackCache(track);
         synchronized (announcementTracks) {
-            if (announcementTracks.containsKey(track.getInfo().uri)) {
-                AnnouncementTrack announcementTrack = announcementTracks.get(track.getInfo().uri);
+            final var announcementTrackKey = announcementTracks.keySet().stream()
+                    .filter(announcementKey -> announcementKey.contains(track.getIdentifier()))
+                    .findAny();
+            if (announcementTrackKey.isPresent()) {
+                final AnnouncementTrack announcementTrack = announcementTracks.get(announcementTrackKey.get());
 
                 // handle upcoming announcement
                 track.setPosition(Math.round(announcementTrack.getStartTime() * 1000));
-                long setEndTime;
+                final long setEndTime;
                 if (announcementTrack.getEndTime() == 0) {
                     setEndTime = track.getDuration();
                 } else {
                     setEndTime = Math.round(announcementTrack.getEndTime()) * 1000;
                 }
-                TrackMarker trackMarker = new TrackMarker(setEndTime, (markerState) -> {
+                final TrackMarker trackMarker = new TrackMarker(setEndTime, (markerState) -> {
                     if (markerState == TrackMarkerHandler.MarkerState.REACHED) {
                         logger.debug("Marker has been reached");
                     } else if (markerState == TrackMarkerHandler.MarkerState.ENDED) {
@@ -95,7 +98,7 @@ public class TrackScheduler implements AudioLoadResultHandler {
     }
 
     @Override
-    public void playlistLoaded(AudioPlaylist playlist) {
+    public void playlistLoaded(final AudioPlaylist playlist) {
         // LavaPlayer found multiple AudioTracks from some playlist
         logger.info(String.format("playlist loaded: %s", playlist.getName()));
         player.stopTrack();
@@ -117,8 +120,8 @@ public class TrackScheduler implements AudioLoadResultHandler {
         logger.error(String.format("failed to load item with exception: %s", exception.getMessage()));
     }
 
-    public synchronized void addToAnnouncementTrackQueue(AnnouncementTrack announcementTrack) {
-        String announcementTrackKey = announcementTrack.getTrackUrl();
+    public synchronized void addToAnnouncementTrackQueue(final AnnouncementTrack announcementTrack) {
+        final String announcementTrackKey = announcementTrack.getTrackUrl();
         announcementTracks.putIfAbsent(announcementTrackKey, announcementTrack);
     }
 
