@@ -2,6 +2,7 @@ package com.bob.jr.commands;
 
 import com.bob.jr.Intent;
 import com.bob.jr.interfaces.ApplicationCommandInterface;
+import com.bob.jr.channelevents.ChannelWatcher;
 import com.bob.jr.utils.ServerResources;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import discord4j.core.event.domain.interaction.ApplicationCommandInteractionEvent;
@@ -13,6 +14,8 @@ import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.channel.VoiceChannel;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
@@ -38,6 +41,7 @@ public class PlayerCommands {
     private final String PLAY_COMMAND_SOURCE_OPTION = "audio_source";
     private final String SEARCH_COMMAND_TERM_OPTION = "search_term";
     private final String JOIN_CHANNEL_OPTION = "join_channel";
+    private final Logger logger = LoggerFactory.getLogger(PlayerCommands.class.getName());
 
     private final ApplicationCommandOptionData joinChannelOption = ApplicationCommandOptionData.builder()
             .name(JOIN_CHANNEL_OPTION)
@@ -111,7 +115,7 @@ public class PlayerCommands {
 
     public Mono<Void> playCommand(final Intent intent) {
         return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
-                .flatMap(member -> playCommandFunction(member, intent.getIntentContext(), true))
+                .flatMap(member -> playCommandFunction(member, intent, intent.getIntentContext(), true))
                 .then();
     }
 
@@ -120,16 +124,19 @@ public class PlayerCommands {
         final var joinChannel = getApplicationOptionBoolean(applicationCommandInteractionEvent, JOIN_CHANNEL_OPTION);
 
         return Mono.justOrEmpty(applicationCommandInteractionEvent.getInteraction().getMember().orElseThrow())
-                .flatMap(member -> playCommandFunction(member, playCommandSourceUrl, joinChannel))
+                .flatMap(member -> playCommandFunction(member, null, playCommandSourceUrl, joinChannel))
                 .then();
     }
 
-    public Mono<Void> playCommandFunction(final Member member, final String resourceUrl, final boolean joinChannel) {
+    public Mono<Void> playCommandFunction(final Member member, final Intent intent, @Nullable final String sourceUrl, final boolean joinChannel) {
         final var prePlayMono = joinChannel ?
                 member.getVoiceState().flatMap(VoiceState::getChannel).flatMap(VoiceChannel::join) :
                 Mono.empty();
         return prePlayMono
-                .doOnSuccess(voided -> serverResources.getAudioPlayerManager().loadItem(resourceUrl, serverResources.getTrackScheduler()))
+                .doOnSuccess(voided -> {
+                    final var context = checkAndHandleFile(intent.getIntentContext());
+                    serverResources.getAudioPlayerManager().loadItem(resourceUrl, serverResources.getTrackScheduler())
+                })
                 .then();
     }
 
@@ -155,6 +162,21 @@ public class PlayerCommands {
         return preSearchMono
                 .doOnSuccess(voided -> serverResources.getAudioPlayerManager().loadItem(String.format("ytsearch:%s", searchTerm), serverResources.getTrackScheduler()))
                 .then();
+    }
+
+    public Mono<Void> playAnnouncementTrack(final Intent intent) {
+        final var splitIntent = intent.getIntentContext().trim().split(" ");
+        var trackStartTime = -1;
+        if (splitIntent.length == 2) {
+            try {
+                trackStartTime = Integer.parseInt(splitIntent[1]);
+            } catch (final NumberFormatException nfe) {
+                logger.error(String.format("bad track start time provided: %s", splitIntent[1]));
+            }
+        }
+        final var context = checkAndHandleFile(splitIntent[0]);
+        ChannelWatcher.playAnnouncementTrack(context, trackStartTime, serverResources);
+        return Mono.empty();
     }
 
     public Mono<Void> playlist(final Intent intent) {
@@ -187,4 +209,14 @@ public class PlayerCommands {
                 .then();
     }
 
+
+    private String checkAndHandleFile(final String intentContext) {
+        var resourceLocation = intentContext;
+        if (intentContext.startsWith("file:")) {
+            final var fileLocation = intentContext.split("file:");
+            resourceLocation = serverResources.handleFile(fileLocation[1]);
+        }
+
+        return resourceLocation;
+    }
 }

@@ -1,6 +1,8 @@
 .gradle
 .idea/
 src/main/resources/**
+!src/main/resources/soundFiles
+!src/main/resources/soundFiles/readme.txt
 !src/main/resources/logback.xml
 !src/main/resources/readme.txt
 **/build/

@@ -17,13 +17,13 @@ public class ServerResources {
     private final TextToSpeech textToSpeech;
     private final AudioTrackCache audioTrackCache;
 
-    public ServerResources(AudioProvider serverAudioProvider,
-                           TrackScheduler trackScheduler,
-                           GatewayDiscordClient gatewayClient,
-                           AudioPlayer audioPlayer,
-                           AudioPlayerManager audioPlayerManager,
-                           TextToSpeech textToSpeech,
-                           AudioTrackCache audioTrackCache) {
+    public ServerResources(final AudioProvider serverAudioProvider,
+                           final TrackScheduler trackScheduler,
+                           final GatewayDiscordClient gatewayClient,
+                           final AudioPlayer audioPlayer,
+                           final AudioPlayerManager audioPlayerManager,
+                           final TextToSpeech textToSpeech,
+                           final AudioTrackCache audioTrackCache) {
         this.serverAudioProvider = serverAudioProvider;
         this.trackScheduler = trackScheduler;
         this.gatewayClient = gatewayClient;
@@ -59,5 +59,12 @@ public class ServerResources {
 
     public AudioTrackCache getAudioTrackCache() {
         return audioTrackCache;
+    }
+
+    public String handleFile(final String fileName) {
+        final var resource = getClass().getClassLoader().getResource("soundFiles/" + fileName);
+        return resource != null
+                ? resource.getFile() // file found in classpath
+                : "/opt/bob-jr/soundFiles/" + fileName;
     }
 }
