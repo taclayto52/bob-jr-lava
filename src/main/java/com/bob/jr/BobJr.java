@@ -48,7 +48,6 @@ public class BobJr {
     private static final ConcurrentHashMap<Guild, List<Role>> botRoles = new ConcurrentHashMap<>();
     private static String botName;
     private static String botNickName;
-    private static final ConcurrentHashMap<Guild, List<Role>> botRoles = new ConcurrentHashMap<>();
 
     static {
         commands.put("ping", intent -> intent.getMessageCreateEvent().getMessage()
@@ -214,6 +213,7 @@ public class BobJr {
 
         registerApplicationCommands(List.of(basicCommands))
                 .doOnError(BobJr::logThrowableAndPrintStackTrace)
+                .onErrorComplete()
                 .block();
 
         // register application commands

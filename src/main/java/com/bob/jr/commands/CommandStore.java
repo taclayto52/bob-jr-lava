@@ -74,7 +74,7 @@ public class CommandStore {
 
         Flux.fromIterable(commandsToDeregister).flatMap(applicationCommandData ->
                         gatewayDiscordClient.getRestClient().getApplicationService()
-                                .deleteGlobalApplicationCommand(applicationId.asLong(), Long.parseLong(applicationCommandData.id()))
+                                .deleteGlobalApplicationCommand(applicationId.asLong(), applicationCommandData.id().asLong())
                                 .doOnSuccess((voided) -> {
                                     logger.info(String.format("Deleted application command %s", applicationCommandData.name()));
                                     commandsRegistered.remove(applicationCommandData);

@@ -1,8 +1,8 @@
 package com.bob.jr.commands;
 
 import com.bob.jr.Intent;
-import com.bob.jr.interfaces.ApplicationCommandInterface;
 import com.bob.jr.channelevents.ChannelWatcher;
+import com.bob.jr.interfaces.ApplicationCommandInterface;
 import com.bob.jr.utils.ServerResources;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import discord4j.core.event.domain.interaction.ApplicationCommandInteractionEvent;
@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
+import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -135,7 +136,7 @@ public class PlayerCommands {
         return prePlayMono
                 .doOnSuccess(voided -> {
                     final var context = checkAndHandleFile(intent.getIntentContext());
-                    serverResources.getAudioPlayerManager().loadItem(resourceUrl, serverResources.getTrackScheduler())
+                    serverResources.getAudioPlayerManager().loadItem(sourceUrl, serverResources.getTrackScheduler());
                 })
                 .then();
     }
