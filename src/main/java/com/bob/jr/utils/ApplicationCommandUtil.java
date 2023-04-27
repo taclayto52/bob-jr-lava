@@ -22,4 +22,13 @@ public interface ApplicationCommandUtil {
                 .asBoolean();
     }
 
+    static long getApplicationOptionLong(final ApplicationCommandInteractionEvent applicationCommandInteractionEvent,
+                                         final String optionName) {
+        return applicationCommandInteractionEvent
+                .getInteraction().getCommandInteraction().orElseThrow()
+                .getOption(optionName).orElseThrow()
+                .getValue().orElseThrow()
+                .asLong();
+    }
+
 }

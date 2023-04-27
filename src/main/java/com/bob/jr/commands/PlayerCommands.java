@@ -26,8 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.bob.jr.utils.ApplicationCommandUtil.getApplicationOptionBoolean;
-import static com.bob.jr.utils.ApplicationCommandUtil.getApplicationOptionString;
+import static com.bob.jr.utils.ApplicationCommandUtil.*;
 import static com.bob.jr.utils.LimitsHelper.MESSAGE_LIMIT;
 import static com.bob.jr.utils.LimitsHelper.PLAYLIST_RETURN_LIMIT;
 
@@ -44,12 +43,20 @@ public class PlayerCommands implements CommandRegistrar {
     private final String PLAY_COMMAND_SOURCE_OPTION = "audio_source";
     private final String SEARCH_COMMAND_TERM_OPTION = "search_term";
     private final String JOIN_CHANNEL_OPTION = "join_channel";
+    private final String SET_VOLUME_OPTION = "set_volume";
     private final Logger logger = LoggerFactory.getLogger(PlayerCommands.class.getName());
 
     private final ApplicationCommandOptionData joinChannelOption = ApplicationCommandOptionData.builder()
             .name(JOIN_CHANNEL_OPTION)
             .description("Have the bot join your channel?")
             .type(ApplicationCommandOption.Type.BOOLEAN.getValue())
+            .required(false)
+            .build();
+
+    private final ApplicationCommandOptionData setVolumeOption = ApplicationCommandOptionData.builder()
+            .name(SET_VOLUME_OPTION)
+            .description("Set the bot volume.")
+            .type(ApplicationCommandOption.Type.INTEGER.getValue())
             .required(false)
             .build();
 
@@ -106,6 +113,18 @@ public class PlayerCommands implements CommandRegistrar {
         return commandStore.registerCommand(playlistApplicationCommand);
     }
 
+    public Disposable registerVolumeCommand() {
+        final ApplicationCommandRequest volumeApplicationCommand = ApplicationCommandRequest.builder()
+                .name(VOLUME_COMMAND_HOOK)
+                .type(ApplicationCommand.Type.CHAT_INPUT.getValue())
+                .description("Get (or set) the bot volume.")
+                .addAllOptions(List.of(setVolumeOption))
+                .build();
+
+        playerCommandMap.put(VOLUME_COMMAND_HOOK, this::volumeCommand);
+        return commandStore.registerCommand(volumeApplicationCommand);
+    }
+
     public Mono<Void> setVolume(final Intent intent) {
         return Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
                 .flatMap(Message::getChannel)
@@ -125,6 +144,34 @@ public class PlayerCommands implements CommandRegistrar {
                     messageChannel.createMessage(String.format("Volume set at %s", volume)).block();
                 })
                 .then();
+    }
+
+    public Mono<Void> volumeCommand(final Intent intent) {
+        final var volumeString = intent.getIntentContext();
+        final var channel = intent.getMessageCreateEvent().getMessage().getChannel().block();
+
+        var volume = -1;
+        if (volumeString != null) {
+            volume = Integer.parseInt(volumeString.split(" ")[0]);
+        }
+
+        return volumeFunction(channel, volume);
+    }
+
+    public Mono<Void> volumeCommand(final ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
+        final var volume = getApplicationOptionLong(applicationCommandInteractionEvent, SET_VOLUME_OPTION);
+        final var channel = applicationCommandInteractionEvent.getInteraction().getChannel().block();
+
+        return volumeFunction(channel, (int) volume);
+    }
+
+    public Mono<Void> volumeFunction(MessageChannel messageChannel, int volume) {
+        if (volume != -1) {
+            serverResources.getAudioPlayer().setVolume(volume);
+        } else {
+            volume = serverResources.getAudioPlayer().getVolume();
+        }
+        return messageChannel.createMessage(String.format("Volume set at %s", volume)).then();
     }
 
     public Mono<Void> playCommand(final Intent intent) {
@@ -254,7 +301,7 @@ public class PlayerCommands implements CommandRegistrar {
 
     @Override
     public Disposable registerCommands() {
-        return Flux.fromIterable(List.of(registerPlaylistCommand(), registerPlayCommand(), registerSearchCommand()))
+        return Flux.fromIterable(List.of(registerPlaylistCommand(), registerPlayCommand(), registerSearchCommand(), registerVolumeCommand()))
                 .doOnComplete(() -> logger.info("Finished registering {}", PlayerCommands.class.getName()))
                 .blockLast();
     }
