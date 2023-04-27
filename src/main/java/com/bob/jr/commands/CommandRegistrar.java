@@ -1,9 +1,9 @@
 package com.bob.jr.commands;
 
-import reactor.core.publisher.Mono;
+import reactor.core.Disposable;
 
 public interface CommandRegistrar {
 
-    public Mono<Void> registerCommands();
+    public Disposable registerCommands();
 
 }

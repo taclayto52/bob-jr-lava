@@ -10,13 +10,16 @@ import discord4j.core.object.command.ApplicationCommand;
 import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.channel.VoiceChannel;
 import discord4j.discordjson.json.ApplicationCommandRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.*;
 
 public class BasicCommands implements CommandRegistrar {
-
+    private static Logger logger = LoggerFactory.getLogger(BasicCommands.class);
     private final ServerResources serverResources;
     private final CommandStore commandStore;
 
@@ -30,7 +33,7 @@ public class BasicCommands implements CommandRegistrar {
         this.commandStore = commandStore;
     }
 
-    public Mono<Void> registerJoinCommand() {
+    public Disposable registerJoinCommand() {
         final ApplicationCommandRequest joinApplicationCommand = ApplicationCommandRequest.builder()
                 .name("join")
                 .type(ApplicationCommand.Type.CHAT_INPUT.getValue())
@@ -41,7 +44,7 @@ public class BasicCommands implements CommandRegistrar {
         return commandStore.registerCommand(joinApplicationCommand);
     }
 
-    public Mono<Void> registerLeaveCommand() {
+    public Disposable registerLeaveCommand() {
         final ApplicationCommandRequest leaveApplicationCommand = ApplicationCommandRequest.builder()
                 .name("leave")
                 .type(ApplicationCommand.Type.CHAT_INPUT.getValue())
@@ -53,7 +56,7 @@ public class BasicCommands implements CommandRegistrar {
         return commandStore.registerCommand(leaveApplicationCommand);
     }
 
-    public Mono<Void> registerStopCommand() {
+    public Disposable registerStopCommand() {
         final ApplicationCommandRequest leaveApplicationCommand = ApplicationCommandRequest.builder()
                 .name("stop")
                 .type(ApplicationCommand.Type.CHAT_INPUT.getValue())
@@ -130,7 +133,9 @@ public class BasicCommands implements CommandRegistrar {
     }
 
     @Override
-    public Mono<Void> registerCommands() {
-        return Flux.fromIterable(List.of(registerJoinCommand(), registerLeaveCommand(), registerStopCommand())).blockLast();
+    public Disposable registerCommands() {
+        return Flux.fromIterable(List.of(registerJoinCommand(), registerLeaveCommand(), registerStopCommand()))
+                .doOnComplete(() -> logger.info("Finished registering {}", BasicCommands.class.getName()))
+                .blockLast();
     }
 }

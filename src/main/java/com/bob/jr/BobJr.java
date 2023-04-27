@@ -28,6 +28,7 @@ import discord4j.core.object.entity.Role;
 import discord4j.voice.AudioProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -211,13 +212,11 @@ public class BobJr {
         final PlayerCommands playerCommands = new PlayerCommands(serverResources, commandStore);
         final VoiceCommands voiceCommands = new VoiceCommands(serverResources);
 
-        registerApplicationCommands(List.of(basicCommands))
-                .doOnError(BobJr::logThrowableAndPrintStackTrace)
-                .onErrorComplete()
-                .block();
+        registerApplicationCommands(List.of(basicCommands, playerCommands));
 
         // register application commands
         applicationCommands.putAll(basicCommands.getApplicationCommandInterfaces());
+        applicationCommands.putAll(playerCommands.getApplicationCommandInterfaces());
 
         // basic commands
         commands.put("join", basicCommands::joinCommand);
@@ -231,7 +230,7 @@ public class BobJr {
         // player commands
         commands.put("play", playerCommands::playCommand);
         commands.put("search", playerCommands::searchCommand);
-        commands.put("playlist", playerCommands::playlist);
+        commands.put("playlist", playerCommands::playlistCommand);
         commands.put("volume", playerCommands::setVolume);
 
         // rick
@@ -255,8 +254,11 @@ public class BobJr {
         return serverResources;
     }
 
-    private Mono<Void> registerApplicationCommands(final List<CommandRegistrar> commandRegistrars) {
-        return Flux.fromIterable(commandRegistrars).flatMap(CommandRegistrar::registerCommands).next();
+    private Disposable registerApplicationCommands(final List<CommandRegistrar> commandRegistrars) {
+        final var allCommandsRegistered = Flux.fromIterable(commandRegistrars).flatMap((commandRegistrar) -> Mono.just(commandRegistrar.registerCommands()))
+                .blockLast();
+        logger.info("All commands registered");
+        return allCommandsRegistered;
     }
 
     public Intent extractIntent(final String incomingMessage, final MessageCreateEvent event) {

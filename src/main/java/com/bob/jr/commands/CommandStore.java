@@ -7,6 +7,7 @@ import discord4j.discordjson.json.ApplicationCommandData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -47,23 +48,26 @@ public class CommandStore {
         return Mono.just(commandsRegistered);
     }
 
-    public Mono<Void> registerCommand(ApplicationCommandRequest applicationCommandRequest) {
+    public Disposable registerCommand(ApplicationCommandRequest applicationCommandRequest) {
         final var matchedRegisteredCommands = commandsRegistered.stream()
                 .filter(applicationCommandData -> applicationCommandData.name().equals(applicationCommandRequest.name()))
                 .count();
         if (matchedRegisteredCommands > 0) {
             logger.info(String.format("command with name: '%s' already registered", applicationCommandRequest.name()));
-            return Mono.empty();
+            return Mono.empty().subscribe();
         }
+
+        logger.info("Registering command {}", applicationCommandRequest.name());
         return gatewayDiscordClient
                 .getRestClient().getApplicationService()
                 .createGlobalApplicationCommand(applicationId.asLong(), applicationCommandRequest)
                 .doOnSuccess(applicationCommandData -> {
-                    logger.info(String.format("Sent request to create application command %s", applicationCommandData.name()));
+                    logger.info(String.format("Registered application command %s", applicationCommandData.name()));
                     commandsRegistered.add(applicationCommandData);
                 })
                 .doOnError(BobJr::logThrowableAndPrintStackTrace)
-                .then();
+                .onErrorComplete()
+                .subscribe();
     }
 
     public void deregisterCommand(List<String> commandNames) {
