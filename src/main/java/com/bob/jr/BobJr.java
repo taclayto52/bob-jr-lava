@@ -210,9 +210,9 @@ public class BobJr {
         final CommandStore commandStore = new CommandStore(client);
         final BasicCommands basicCommands = new BasicCommands(serverResources, commandStore);
         final PlayerCommands playerCommands = new PlayerCommands(serverResources, commandStore);
-        final VoiceCommands voiceCommands = new VoiceCommands(serverResources);
+        final VoiceCommands voiceCommands = new VoiceCommands(serverResources, commandStore);
 
-        registerApplicationCommands(List.of(basicCommands, playerCommands));
+        registerApplicationCommands(List.of(basicCommands, playerCommands, voiceCommands));
 
         // register application commands
         applicationCommands.putAll(basicCommands.getApplicationCommandInterfaces());
@@ -222,7 +222,7 @@ public class BobJr {
         commands.put("join", basicCommands::joinCommand);
         commands.put("quit", basicCommands::leaveCommand);
         commands.put("leave", basicCommands::leaveCommand);
-        commands.put("stop", basicCommands::stop);
+        commands.put("stop", basicCommands::stopCommand);
 
         // test commands
         commands.put("play-announcement-track", playerCommands::playAnnouncementTrack);
@@ -231,7 +231,7 @@ public class BobJr {
         commands.put("play", playerCommands::playCommand);
         commands.put("search", playerCommands::searchCommand);
         commands.put("playlist", playerCommands::playlistCommand);
-        commands.put("volume", playerCommands::setVolume);
+        commands.put("volume", playerCommands::volumeCommand);
 
         // rick
         commands.put("rick", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
@@ -242,14 +242,14 @@ public class BobJr {
                 .then());
 
         // get voices
-        commands.put("voices", voiceCommands::voices);
+        commands.put("voices", voiceCommands::voicesCommand);
         commands.put("myvoice-all", voiceCommands::myVoiceAll);
         commands.put("myvoice", voiceCommands::myVoice);
-        commands.put("pitch", voiceCommands::pitch);
+        commands.put("pitch", voiceCommands::pitchCommand);
         commands.put("speaking-rate", voiceCommands::speakingRate);
 
         // tts
-        commands.put("tts", voiceCommands::tts);
+        commands.put("tts", voiceCommands::ttsCommand);
 
         return serverResources;
     }

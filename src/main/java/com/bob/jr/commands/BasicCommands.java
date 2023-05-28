@@ -123,7 +123,7 @@ public class BasicCommands implements CommandRegistrar {
     }
 
     // just stop for god's sake
-    public Mono<Void> stop(Intent intent) {
+    public Mono<Void> stopCommand(Intent intent) {
         stopCommandFunction();
         return Mono.empty();
     }

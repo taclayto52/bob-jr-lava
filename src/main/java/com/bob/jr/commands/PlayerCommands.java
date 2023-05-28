@@ -10,7 +10,6 @@ import discord4j.core.object.VoiceState;
 import discord4j.core.object.command.ApplicationCommand;
 import discord4j.core.object.command.ApplicationCommandOption;
 import discord4j.core.object.entity.Member;
-import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.channel.MessageChannel;
 import discord4j.core.object.entity.channel.VoiceChannel;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
@@ -123,27 +122,6 @@ public class PlayerCommands implements CommandRegistrar {
 
         playerCommandMap.put(VOLUME_COMMAND_HOOK, this::volumeCommand);
         return commandStore.registerCommand(volumeApplicationCommand);
-    }
-
-    public Mono<Void> setVolume(final Intent intent) {
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
-                .flatMap(Message::getChannel)
-                .doOnSuccess(messageChannel -> {
-                    var volume = -1; // -1 to indicate never set
-                    final String intentContext = intent.getIntentContext();
-                    if (intentContext != null) {
-                        volume = Integer.parseInt(intentContext.split(" ")[0]);
-                    }
-
-
-                    if (volume != -1) {
-                        serverResources.getAudioPlayer().setVolume(volume);
-                    } else {
-                        volume = serverResources.getAudioPlayer().getVolume();
-                    }
-                    messageChannel.createMessage(String.format("Volume set at %s", volume)).block();
-                })
-                .then();
     }
 
     public Mono<Void> volumeCommand(final Intent intent) {
