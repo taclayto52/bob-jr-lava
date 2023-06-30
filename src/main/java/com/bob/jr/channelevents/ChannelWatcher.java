@@ -43,7 +43,7 @@ public class ChannelWatcher {
             playAnnouncementTrack(loadClipString, -1, serverResources);
             monoVoid = Mono.empty();
         } else {
-            final String userName = member.getNickname().orElse("I don't know");
+            final String userName = member.getNickname().orElse(member.getUsername());
             final AnnouncementTrack announcementTrack = new AnnouncementTrack("synthString", member.getDisplayName(), contextAction);
             serverResources.getTrackScheduler().addToAnnouncementTrackQueue(announcementTrack);
             monoVoid = Mono.justOrEmpty(serverResources.getTextToSpeech().synthesizeTextMono(member, String.format("%s %s", userName, contextString)).block())
