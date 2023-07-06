@@ -10,24 +10,30 @@ import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
+
+import static com.bob.jr.utils.RegexHelper.IP_REGEX;
 
 public class HealthCheck implements Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(HealthCheck.class);
-
+    final static Predicate<String> ipMatchPredicate = Pattern.compile(IP_REGEX).asMatchPredicate();
     final static ByteBuffer BYTE_RESPONSE = ByteBuffer.wrap("OK".getBytes(StandardCharsets.US_ASCII));
     final AsynchronousServerSocketChannel serverSocket;
     boolean running;
 
     public HealthCheck(final int port) throws IOException {
-        final var networkInterfaceIterator = NetworkInterface.getNetworkInterfaces().asIterator();
-        while (networkInterfaceIterator.hasNext()) {
-            final var networkInterface = networkInterfaceIterator.next();
-            logger.info("Network interface - name: {}", networkInterface.getDisplayName());
-            final var inetAddresses = networkInterface.inetAddresses();
-            inetAddresses.forEach(inetAddress -> logger.info("address: {}; hostaddress: {};", inetAddress.getHostName(), inetAddress.getHostAddress()));
-        }
-        final var inetSocketAddress = new InetSocketAddress("localhost", port);
+        final var networkInterface = NetworkInterface.getByName("eth0");
+
+        final var internalHostAddress = networkInterface.getInterfaceAddresses().stream()
+                .map(interfaceAddress -> interfaceAddress.getAddress().getHostAddress())
+                .filter(ipMatchPredicate)
+                .findFirst()
+                .orElse("localhost");
+        logger.info("Setting internal host address: {}", internalHostAddress);
+        
+        final var inetSocketAddress = new InetSocketAddress(internalHostAddress, port);
         serverSocket = AsynchronousServerSocketChannel.open().bind(inetSocketAddress);
         running = true;
     }
