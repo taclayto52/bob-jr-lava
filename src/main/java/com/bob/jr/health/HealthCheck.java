@@ -24,9 +24,7 @@ public class HealthCheck implements Runnable {
         while (running) {
             try (final var openSocket = serverSocket.accept().get()) {
                 openSocket.write(BYTE_RESPONSE).get();
-            } catch (ExecutionException | InterruptedException e) {
-                throw new RuntimeException(e);
-            } catch (IOException e) {
+            } catch (ExecutionException | InterruptedException | IOException e) {
                 throw new RuntimeException(e);
             } finally {
                 BYTE_RESPONSE.clear();
