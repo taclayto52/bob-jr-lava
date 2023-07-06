@@ -5,6 +5,7 @@ import com.bob.jr.channelevents.ChannelWatcher;
 import com.bob.jr.commands.BasicCommands;
 import com.bob.jr.commands.PlayerCommands;
 import com.bob.jr.commands.VoiceCommands;
+import com.bob.jr.health.HealthCheck;
 import com.bob.jr.interfaces.Command;
 import com.bob.jr.interfaces.VoidCommand;
 import com.bob.jr.utils.AudioTrackCache;
@@ -58,6 +59,13 @@ public class BobJr {
     private final HeartBeats heartBeats;
 
     public BobJr(@Nullable final String token) {
+        // setup health checks
+        try {
+            new Thread(new HealthCheck(8080)).start();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         // setup GCloud text to speech
         final TextToSpeech tts = setupTextToSpeech();
 
