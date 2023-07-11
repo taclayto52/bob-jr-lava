@@ -37,6 +37,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.bob.jr.utils.FluxUtils.logFluxError;
+
 public class BobJr {
 
     private static final Map<String, Command> commands = new HashMap<>();
@@ -153,10 +155,8 @@ public class BobJr {
         return Flux.fromIterable(commands.entrySet())
                 .filter(entry -> intent.getIntentName().equals(entry.getKey()))
                 .flatMap(entry -> entry.getValue().execute(intent))
-                .doOnError(throwable -> {
-                    logger.error(String.format("Error noticed in handleMessageCreateEvent {}", throwable.getMessage()));
-                    throwable.printStackTrace();
-                })
+                .doOnError(logFluxError(logger, "handleMessageCreateEvent"))
+                .onErrorComplete()
                 .next();
     }
 

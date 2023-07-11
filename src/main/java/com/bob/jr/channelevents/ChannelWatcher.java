@@ -1,15 +1,21 @@
 package com.bob.jr.channelevents;
 
+import com.bob.jr.BobJr;
 import com.bob.jr.utils.AnnouncementTrack;
 import com.bob.jr.utils.ServerResources;
 import discord4j.core.event.domain.VoiceStateUpdateEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import java.util.Locale;
 import java.util.Random;
 
+import static com.bob.jr.utils.FluxUtils.logFluxError;
+
 public class ChannelWatcher {
 
+    private static final Logger logger = LoggerFactory.getLogger(BobJr.class);
     private final ServerResources serverResources;
     private final boolean testSoundClipLoad = true;
 
@@ -55,6 +61,8 @@ public class ChannelWatcher {
                             serverResources.getTrackScheduler().trackLoaded(cachedAudioTrack);
                         }
                     })
+                    .doOnError(logFluxError(logger, "voiceStateUpdateEventHandler"))
+                    .onErrorComplete()
                     .then();
         }
         return monoVoid;
