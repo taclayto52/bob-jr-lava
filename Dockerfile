@@ -23,4 +23,6 @@ ENV DD_API_KEY=${DATA_DOG_API_KEY}
 ENV DD_SITE="datadoghq.com"
 RUN curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script.sh
 
+EXPOSE 8080/tcp
+
 CMD ["java", "-jar", "/opt/bob-jr/bob-jr-lava-all.jar"]
