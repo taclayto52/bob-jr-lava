@@ -40,16 +40,15 @@ public class ChannelWatcher {
         Mono<Void> monoVoid = null;
 //        serverResources.getTrackScheduler().setAnnouncementPlayer();
         final var member = Mono.justOrEmpty(voiceStateUpdateEvent.getCurrent().getMember().block()).block();
-        final var memberDisplayName = member.getDisplayName();
         if (member.isBot()) {
             return Mono.empty();
         }
-        if (voiceStateUpdateEvent.isJoinEvent() && testSoundClipLoad && memberDisplayName.toLowerCase(Locale.ROOT).contains("vsepr")) {
+        if (voiceStateUpdateEvent.isJoinEvent() && testSoundClipLoad && member.getUsername().toLowerCase(Locale.ROOT).contains("vsepr")) {
             final String loadClipString = serverResources.handleFile("Bimpson.webm");
             playAnnouncementTrack(loadClipString, -1, serverResources);
             monoVoid = Mono.empty();
         } else {
-            final String userName = member.getNickname().orElse(member.getUsername());
+            final String userName = member.getNickname().orElse(member.getDisplayName());
             final AnnouncementTrack announcementTrack = new AnnouncementTrack("synthString", member.getDisplayName(), contextAction);
             serverResources.getTrackScheduler().addToAnnouncementTrackQueue(announcementTrack);
             monoVoid = Mono.justOrEmpty(serverResources.getTextToSpeech().synthesizeTextMono(member, String.format("%s %s", userName, contextString)).block())
