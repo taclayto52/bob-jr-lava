@@ -6,6 +6,12 @@ plugins {
 
 project.setVersion("0.1.0")
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
 repositories {   // repositories for Jar's you access in your code
     mavenCentral()
     maven {
