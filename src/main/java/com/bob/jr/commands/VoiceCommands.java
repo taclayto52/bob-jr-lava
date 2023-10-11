@@ -207,7 +207,7 @@ public class VoiceCommands implements CommandRegistrar {
                 break;
             default:
                 if (pitchValue.matches(RegexHelper.POS_NEG_DECIMAL_REGEX)) {
-                    final double doubleValue = Integer.parseInt(pitchValue) > 0 ?
+                    final double doubleValue = Double.parseDouble(pitchValue) > 0 ?
                             Math.min(Double.parseDouble(pitchValue), LimitsHelper.PitchLimits.upperLimit) :
                             Math.max(Double.parseDouble(pitchValue), LimitsHelper.PitchLimits.lowerLimit);
                     tts.getMemberVoice(member).setPitchInAudioConfigBuilder(doubleValue);
@@ -242,7 +242,7 @@ public class VoiceCommands implements CommandRegistrar {
                             break;
                         default:
                             if (context.matches(RegexHelper.POS_DECIMAL_REGEX)) {
-                                final double doubleValue = Integer.parseInt(context) > 0 ?
+                                final double doubleValue = Double.parseDouble(context) > 0 ?
                                         Math.min(Double.parseDouble(context), LimitsHelper.SpeakingRateLimits.upperLimit) :
                                         Math.max(Double.parseDouble(context), LimitsHelper.SpeakingRateLimits.lowerLimit);
                                 tts.getMemberVoice(member).setSpeakingRateInAudioConfigBuilder(doubleValue);

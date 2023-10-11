@@ -3,6 +3,7 @@ package com.bob.jr;
 import com.bob.jr.TextToSpeech.TextToSpeech;
 import com.bob.jr.channelevents.ChannelWatcher;
 import com.bob.jr.commands.*;
+import com.bob.jr.health.HealthCheck;
 import com.bob.jr.interfaces.ApplicationCommandInterface;
 import com.bob.jr.interfaces.Command;
 import com.bob.jr.interfaces.VoidCommand;
@@ -37,6 +38,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.bob.jr.utils.FluxUtils.logFluxError;
+
 public class BobJr {
 
     public static final String PROJECT_ID = "937970633558"; // load these from environment var
@@ -60,6 +63,13 @@ public class BobJr {
     private final HeartBeats heartBeats;
 
     public BobJr(@Nullable final String token) {
+        // setup health checks
+        try {
+            new Thread(new HealthCheck(8080)).start();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         // setup GCloud text to speech
         final TextToSpeech tts = setupTextToSpeech();
 
@@ -175,10 +185,8 @@ public class BobJr {
         return Flux.fromIterable(commands.entrySet())
                 .filter(entry -> intent.getIntentName().equals(entry.getKey()))
                 .flatMap(entry -> entry.getValue().execute(intent))
-                .doOnError(throwable -> {
-                    logger.error(String.format("Error noticed in handleMessageCreateEvent {}", throwable.getMessage()));
-                    throwable.printStackTrace();
-                })
+                .doOnError(logFluxError(logger, "handleMessageCreateEvent"))
+                .onErrorComplete()
                 .next();
     }
 

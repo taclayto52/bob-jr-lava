@@ -13,7 +13,7 @@ jobs:
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
-    environment: 
+    environment:
       name: GitHub Action Build
 
     # Steps represent a sequence of tasks that will be executed as part of the job
@@ -31,9 +31,7 @@ jobs:
       # Builds docker image
       - name: Docker build
         run: ./gradlew dockerBuild --no-daemon
-        
+
       # Pushes docker image
       - name: Docker push
-        env: 
-          DATA_DOG_API_KEY: ${{ secrets.DATA_DOG_API_KEY }}
         run: ./gradlew dockerPublish --no-daemon
