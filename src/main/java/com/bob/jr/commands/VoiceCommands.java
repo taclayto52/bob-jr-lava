@@ -268,7 +268,6 @@ public class VoiceCommands implements CommandRegistrar {
     public Mono<Void> ttsCommand(ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
         final var member = applicationCommandInteractionEvent.getInteraction().getMember().orElseThrow();
 
-        // TODO @tclayton update this to conditionally join the channel
         return ttsFunction(member, getApplicationOptionString(applicationCommandInteractionEvent, TTS_COMMAND_TEXT_OPTION), true);
     }
 
@@ -287,17 +286,8 @@ public class VoiceCommands implements CommandRegistrar {
                 .then();
     }
 
-    public Mono<Void> tts(Intent intent) {
-        final var tts = serverResources.textToSpeech();
-        return Mono.justOrEmpty(intent.messageCreateEvent().getMember())
-                .flatMap(member -> Mono.just(member)
-                        .flatMap(Member::getVoiceState)
-                        .flatMap(VoiceState::getChannel)
-                        .flatMap(channel -> channel.join(spec -> spec.setProvider(serverResources.serverAudioProvider())))
-                        .flatMap(connection -> tts.synthesizeTextMono(member, intent.intentContext()))
-                        .doOnSuccess(fileLocation -> serverResources.audioPlayerManager().loadItem(fileLocation, serverResources.trackScheduler()))
-                        .then())
-                .then();
+    public Map<String, ApplicationCommandInterface> getApplicationCommandInterfaces() {
+        return voiceCommandMap;
     }
 
     @Override

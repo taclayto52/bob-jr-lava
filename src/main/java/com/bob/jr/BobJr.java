@@ -225,6 +225,7 @@ public class BobJr {
         // register application commands
         applicationCommands.putAll(basicCommands.getApplicationCommandInterfaces());
         applicationCommands.putAll(playerCommands.getApplicationCommandInterfaces());
+        applicationCommands.putAll(voiceCommands.getApplicationCommandInterfaces());
 
         // basic commands
         commands.put("join", basicCommands::joinCommand);
