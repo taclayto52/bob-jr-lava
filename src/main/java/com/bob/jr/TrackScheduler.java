@@ -62,24 +62,7 @@ public class TrackScheduler implements AudioLoadResultHandler {
 
                 // handle upcoming announcement
                 track.setPosition(Math.round(announcementTrack.getStartTime() * 1000));
-                final long setEndTime;
-                if (announcementTrack.getEndTime() == 0) {
-                    setEndTime = track.getDuration();
-                } else {
-                    setEndTime = Math.round(announcementTrack.getEndTime()) * 1000;
-                }
-                final TrackMarker trackMarker = new TrackMarker(setEndTime, (markerState) -> {
-                    if (markerState == TrackMarkerHandler.MarkerState.REACHED) {
-                        logger.debug("Marker has been reached");
-                    } else if (markerState == TrackMarkerHandler.MarkerState.ENDED) {
-                        logger.debug("Marker has ended");
-                    } else {
-                        logger.debug(String.format("reached unknown marker state: %s", markerState));
-                    }
-                    announcementTracks.remove(announcementTrack.getTrackUrl());
-                    announcementPlayer.stopTrack();
-                    setTrackPlayer();
-                });
+                final TrackMarker trackMarker = getTrackMarker(track, announcementTrack);
                 track.setMarker(trackMarker);
                 setAnnouncementPlayer();
                 announcementPlayer.playTrack(track);
@@ -91,8 +74,29 @@ public class TrackScheduler implements AudioLoadResultHandler {
         }
     }
 
+    private TrackMarker getTrackMarker(AudioTrack track, AnnouncementTrack announcementTrack) {
+        final long setEndTime;
+        if (announcementTrack.getEndTime() == 0) {
+            setEndTime = track.getDuration();
+        } else {
+            setEndTime = Math.round(announcementTrack.getEndTime()) * 1000;
+        }
+        return new TrackMarker(setEndTime, (markerState) -> {
+            if (markerState == TrackMarkerHandler.MarkerState.REACHED) {
+                logger.debug("Marker has been reached");
+            } else if (markerState == TrackMarkerHandler.MarkerState.ENDED) {
+                logger.debug("Marker has ended");
+            } else {
+                logger.debug(String.format("reached unknown marker state: %s", markerState));
+            }
+            announcementTracks.remove(announcementTrack.getTrackUrl());
+            announcementPlayer.stopTrack();
+            setTrackPlayer();
+        });
+    }
+
     private void handleTrackCache(final AudioTrack track) {
-        if (audioTrackCache != null && !audioTrackCache.checkIfTrackIsPresent(track.getInfo().uri)) {
+        if (audioTrackCache != null && audioTrackCache.checkIfTrackIsPresent(track.getInfo().uri)) {
             audioTrackCache.addTrackToCache(track.getInfo().uri, track);
         }
     }

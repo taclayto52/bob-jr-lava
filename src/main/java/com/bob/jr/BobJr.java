@@ -54,7 +54,7 @@ public class BobJr {
     private static String botNickName;
 
     static {
-        commands.put("ping", intent -> intent.getMessageCreateEvent().getMessage()
+        commands.put("ping", intent -> intent.messageCreateEvent().getMessage()
                 .getChannel()
                 .flatMap(channel -> channel.createMessage("Pong!"))
                 .then());
@@ -183,7 +183,7 @@ public class BobJr {
 
     public Mono<Void> handleMessageCreateEvent(final Intent intent) {
         return Flux.fromIterable(commands.entrySet())
-                .filter(entry -> intent.getIntentName().equals(entry.getKey()))
+                .filter(entry -> intent.intentName().equals(entry.getKey()))
                 .flatMap(entry -> entry.getValue().execute(intent))
                 .doOnError(logFluxError(logger, "handleMessageCreateEvent"))
                 .onErrorComplete()
@@ -242,7 +242,7 @@ public class BobJr {
         commands.put("volume", playerCommands::volumeCommand);
 
         // rick
-        commands.put("rick", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
+        commands.put("rick", intent -> Mono.justOrEmpty(intent.messageCreateEvent().getMember())
                 .flatMap(Member::getVoiceState)
                 .flatMap(VoiceState::getChannel)
                 .flatMap(channel -> channel.join(spec -> spec.setProvider(provider)))

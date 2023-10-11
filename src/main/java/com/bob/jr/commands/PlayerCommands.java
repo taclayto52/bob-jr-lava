@@ -125,8 +125,8 @@ public class PlayerCommands implements CommandRegistrar {
     }
 
     public Mono<Void> volumeCommand(final Intent intent) {
-        final var volumeString = intent.getIntentContext();
-        final var channel = intent.getMessageCreateEvent().getMessage().getChannel().block();
+        final var volumeString = intent.intentContext();
+        final var channel = intent.messageCreateEvent().getMessage().getChannel().block();
 
         var volume = -1;
         if (volumeString != null) {
@@ -145,15 +145,15 @@ public class PlayerCommands implements CommandRegistrar {
 
     public Mono<Void> volumeFunction(MessageChannel messageChannel, int volume) {
         if (volume != -1) {
-            serverResources.getAudioPlayer().setVolume(volume);
+            serverResources.audioPlayer().setVolume(volume);
         } else {
-            volume = serverResources.getAudioPlayer().getVolume();
+            volume = serverResources.audioPlayer().getVolume();
         }
         return messageChannel.createMessage(String.format("Volume set at %s", volume)).then();
     }
 
     public Mono<Void> playCommand(final Intent intent) {
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
+        return Mono.justOrEmpty(intent.messageCreateEvent().getMember())
                 .flatMap(member -> playCommandFunction(member, intent, true))
                 .then();
     }
@@ -168,7 +168,7 @@ public class PlayerCommands implements CommandRegistrar {
     }
 
     public Mono<Void> playCommandFunction(final Member member, final Intent intent, final boolean joinChannel) {
-        return playCommandFunction(member, intent.getIntentContext(), joinChannel);
+        return playCommandFunction(member, intent.intentContext(), joinChannel);
     }
 
     public Mono<Void> playCommandFunction(final Member member, final String sourceUrl, final boolean joinChannel) {
@@ -178,14 +178,14 @@ public class PlayerCommands implements CommandRegistrar {
         return prePlayMono
                 .doOnSuccess(voided -> {
                     final var resourceLocation = checkAndHandleFile(sourceUrl);
-                    serverResources.getAudioPlayerManager().loadItem(resourceLocation, serverResources.getTrackScheduler());
+                    serverResources.audioPlayerManager().loadItem(resourceLocation, serverResources.trackScheduler());
                 })
                 .then();
     }
 
     public Mono<Void> searchCommand(final Intent intent) {
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
-                .flatMap(member -> searchCommandFunction(member, intent.getIntentContext(), true))
+        return Mono.justOrEmpty(intent.messageCreateEvent().getMember())
+                .flatMap(member -> searchCommandFunction(member, intent.intentContext(), true))
                 .then();
     }
 
@@ -203,12 +203,12 @@ public class PlayerCommands implements CommandRegistrar {
                 Mono.empty();
 
         return preSearchMono
-                .doOnSuccess(voided -> serverResources.getAudioPlayerManager().loadItem(String.format("ytsearch:%s", searchTerm), serverResources.getTrackScheduler()))
+                .doOnSuccess(voided -> serverResources.audioPlayerManager().loadItem(String.format("ytsearch:%s", searchTerm), serverResources.trackScheduler()))
                 .then();
     }
 
     public Mono<Void> playAnnouncementTrack(final Intent intent) {
-        final var splitIntent = intent.getIntentContext().trim().split(" ");
+        final var splitIntent = intent.intentContext().trim().split(" ");
         var trackStartTime = -1;
         if (splitIntent.length == 2) {
             try {
@@ -230,15 +230,15 @@ public class PlayerCommands implements CommandRegistrar {
     }
 
     public Mono<Void> playlistCommand(final Intent intent) {
-        final var messageChannel = intent.getMessageCreateEvent().getMessage().getChannel().block();
+        final var messageChannel = intent.messageCreateEvent().getMessage().getChannel().block();
         return Mono.just(playlistCommandFunction(messageChannel))
                 .flatMap(messageChannel::createMessage)
                 .then();
     }
 
     public String playlistCommandFunction(final MessageChannel messageChannel) {
-        final var scheduler = serverResources.getTrackScheduler();
-        final var player = serverResources.getAudioPlayer();
+        final var scheduler = serverResources.trackScheduler();
+        final var player = serverResources.audioPlayer();
 
         final List<AudioTrack> audioTrackList = scheduler.getAudioTracks();
         final StringBuilder printString = new StringBuilder();

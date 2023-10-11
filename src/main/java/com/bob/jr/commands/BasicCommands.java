@@ -60,7 +60,7 @@ public class BasicCommands implements CommandRegistrar {
         final ApplicationCommandRequest leaveApplicationCommand = ApplicationCommandRequest.builder()
                 .name("stop")
                 .type(ApplicationCommand.Type.CHAT_INPUT.getValue())
-                .description(String.format("Stop whatever %s is doing", Objects.requireNonNull(serverResources.getGatewayDiscordClient().getSelf().block()).getUsername()))
+                .description(String.format("Stop whatever %s is doing", Objects.requireNonNull(serverResources.gatewayClient().getSelf().block()).getUsername()))
                 .build();
 
 
@@ -84,14 +84,14 @@ public class BasicCommands implements CommandRegistrar {
     }
 
     public Mono<Void> joinCommand(Intent intent) {
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember().orElseThrow())
+        return Mono.justOrEmpty(intent.messageCreateEvent().getMember().orElseThrow())
                 .flatMap(this::joinCommandFunction)
                 .then();
     }
 
     public Mono<Void> leaveCommandFunction(Snowflake guildSnowflake) {
-        serverResources.getTrackScheduler().clearPlaylist();
-        Optional<VoiceState> voiceStateOptional = Optional.ofNullable(serverResources.getGatewayDiscordClient().getMemberById(guildSnowflake, serverResources.getGatewayDiscordClient().getSelfId())
+        serverResources.trackScheduler().clearPlaylist();
+        Optional<VoiceState> voiceStateOptional = Optional.ofNullable(serverResources.gatewayClient().getMemberById(guildSnowflake, serverResources.gatewayClient().getSelfId())
                 .block()
                 .getVoiceState()
                 .block());
@@ -108,13 +108,13 @@ public class BasicCommands implements CommandRegistrar {
     }
 
     public Mono<Void> leaveCommand(Intent intent) {
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getGuildId())
+        return Mono.justOrEmpty(intent.messageCreateEvent().getGuildId())
                 .flatMap(this::leaveCommandFunction)
                 .then();
     }
 
     public void stopCommandFunction() {
-        serverResources.getTrackScheduler().clearPlaylist();
+        serverResources.trackScheduler().clearPlaylist();
     }
 
     public Mono<Void> stopCommand(ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {

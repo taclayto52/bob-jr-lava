@@ -115,8 +115,8 @@ public class VoiceCommands implements CommandRegistrar {
     }
 
     public Mono<Void> voicesCommand(Intent intent) {
-        final var channel = intent.getMessageCreateEvent().getMessage().getChannel().blockOptional().orElseThrow();
-        return voicesFunction(channel, intent.getIntentContext());
+        final var channel = intent.messageCreateEvent().getMessage().getChannel().blockOptional().orElseThrow();
+        return voicesFunction(channel, intent.intentContext());
     }
 
     public Mono<Void> voicesCommand(ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
@@ -125,19 +125,19 @@ public class VoiceCommands implements CommandRegistrar {
     }
 
     public Mono<Void> voicesFunction(final MessageChannel messageChannel, final String messageContext) {
-        return Mono.just(messageChannel.createMessage(serverResources.getTextToSpeech().getListOfVoices(messageContext)))
+        return Mono.just(messageChannel.createMessage(serverResources.textToSpeech().getListOfVoices(messageContext)))
                 .then();
     }
 
     public Mono<Void> myVoiceAll(Intent intent) {
-        final var tts = serverResources.getTextToSpeech();
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
+        final var tts = serverResources.textToSpeech();
+        return Mono.justOrEmpty(intent.messageCreateEvent().getMessage())
                 .flatMap(Message::getChannel)
                 .flatMap(channel -> {
-                    Optional<Member> member = intent.getMessageCreateEvent().getMember();
+                    Optional<Member> member = intent.messageCreateEvent().getMember();
                     String returnMessage;
-                    if (intent.getIntentContext() != null) {
-                        String[] voiceParams = intent.getIntentContext().split(" ");
+                    if (intent.intentContext() != null) {
+                        String[] voiceParams = intent.intentContext().split(" ");
                         String gender = voiceParams.length >= 1 ? voiceParams[0] : null;
                         String voiceName = voiceParams.length >= 2 ? voiceParams[1] : null;
                         Double pitch = voiceParams.length >= 3 ? Double.valueOf(voiceParams[2]) : null;
@@ -152,14 +152,14 @@ public class VoiceCommands implements CommandRegistrar {
     }
 
     public Mono<Void> myVoice(Intent intent) {
-        final var tts = serverResources.getTextToSpeech();
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
+        final var tts = serverResources.textToSpeech();
+        return Mono.justOrEmpty(intent.messageCreateEvent().getMessage())
                 .flatMap(Message::getChannel)
                 .flatMap(channel -> {
-                    Optional<Member> member = intent.getMessageCreateEvent().getMember();
+                    Optional<Member> member = intent.messageCreateEvent().getMember();
                     String returnMessage;
-                    if (intent.getIntentContext() != null) {
-                        returnMessage = tts.setMemberVoiceConfig(member.get(), null, intent.getIntentContext().trim(), null, null).toString();
+                    if (intent.intentContext() != null) {
+                        returnMessage = tts.setMemberVoiceConfig(member.get(), null, intent.intentContext().trim(), null, null).toString();
                     } else {
                         returnMessage = String.format(":hear_no_evil: No voice provided! To see list of voices try `@BobJr voices`");
                     }
@@ -169,11 +169,11 @@ public class VoiceCommands implements CommandRegistrar {
     }
 
     public Mono<Void> pitchCommand(Intent intent) {
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
+        return Mono.justOrEmpty(intent.messageCreateEvent().getMessage())
                 .flatMap(Message::getChannel)
                 .flatMap(channel -> {
-                    Member member = intent.getMessageCreateEvent().getMember().get();
-                    return pitchFunction(member, channel, Optional.ofNullable(intent.getIntentContext()));
+                    Member member = intent.messageCreateEvent().getMember().get();
+                    return pitchFunction(member, channel, Optional.ofNullable(intent.intentContext()));
                 })
                 .then();
     }
@@ -191,7 +191,7 @@ public class VoiceCommands implements CommandRegistrar {
     public Mono<Void> pitchFunction(final Member member, final MessageChannel channel, final Optional<String> pitchValueOp) {
         final String defaultValue = "DEFAULT_VALUE";
         final String pitchValue = pitchValueOp.orElse(defaultValue);
-        final var tts = serverResources.getTextToSpeech();
+        final var tts = serverResources.textToSpeech();
 
         final double currentPitch = tts.getMemberVoice(member).getAudioConfig().getPitch();
 
@@ -222,14 +222,14 @@ public class VoiceCommands implements CommandRegistrar {
     }
 
     public Mono<Void> speakingRate(Intent intent) {
-        final var tts = serverResources.getTextToSpeech();
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
+        final var tts = serverResources.textToSpeech();
+        return Mono.justOrEmpty(intent.messageCreateEvent().getMessage())
                 .flatMap(Message::getChannel)
                 .flatMap(channel -> {
                     final String defaultValue = "DEFAULT_VALUE";
-                    Member member = intent.getMessageCreateEvent().getMember().get();
+                    Member member = intent.messageCreateEvent().getMember().get();
                     double currentSpeakingRate = tts.getMemberVoice(member).getAudioConfig().getSpeakingRate();
-                    final String context = Optional.ofNullable(intent.getIntentContext()).orElse(defaultValue);
+                    final String context = Optional.ofNullable(intent.intentContext()).orElse(defaultValue);
                     final StringBuilder stringBuilder = new StringBuilder();
                     switch (context) {
                         case "up":
@@ -260,9 +260,9 @@ public class VoiceCommands implements CommandRegistrar {
 
     public Mono<Void> ttsCommand(Intent intent) {
         // join channel
-        final var member = intent.getMessageCreateEvent().getMember().orElseThrow();
+        final var member = intent.messageCreateEvent().getMember().orElseThrow();
 
-        return ttsFunction(member, intent.getIntentContext(), true);
+        return ttsFunction(member, intent.intentContext(), true);
     }
 
     public Mono<Void> ttsCommand(ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
@@ -281,21 +281,21 @@ public class VoiceCommands implements CommandRegistrar {
         }
 
 
-        final var ttsService = serverResources.getTextToSpeech();
+        final var ttsService = serverResources.textToSpeech();
         return Mono.justOrEmpty(ttsService.synthesizeTextMono(member, tts).block())
-                .doOnSuccess(fileLocation -> serverResources.getAudioPlayerManager().loadItem(fileLocation, serverResources.getTrackScheduler()))
+                .doOnSuccess(fileLocation -> serverResources.audioPlayerManager().loadItem(fileLocation, serverResources.trackScheduler()))
                 .then();
     }
 
     public Mono<Void> tts(Intent intent) {
-        final var tts = serverResources.getTextToSpeech();
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
+        final var tts = serverResources.textToSpeech();
+        return Mono.justOrEmpty(intent.messageCreateEvent().getMember())
                 .flatMap(member -> Mono.just(member)
                         .flatMap(Member::getVoiceState)
                         .flatMap(VoiceState::getChannel)
-                        .flatMap(channel -> channel.join(spec -> spec.setProvider(serverResources.getServerAudioProvider())))
-                        .flatMap(connection -> tts.synthesizeTextMono(member, intent.getIntentContext()))
-                        .doOnSuccess(fileLocation -> serverResources.getAudioPlayerManager().loadItem(fileLocation, serverResources.getTrackScheduler()))
+                        .flatMap(channel -> channel.join(spec -> spec.setProvider(serverResources.serverAudioProvider())))
+                        .flatMap(connection -> tts.synthesizeTextMono(member, intent.intentContext()))
+                        .doOnSuccess(fileLocation -> serverResources.audioPlayerManager().loadItem(fileLocation, serverResources.trackScheduler()))
                         .then())
                 .then();
     }
