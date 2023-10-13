@@ -51,13 +51,6 @@ public class BobJr {
     private static String botNickName;
     private static final ConcurrentHashMap<Guild, List<Role>> botRoles = new ConcurrentHashMap<>();
 
-    static {
-        commands.put("ping", intent -> intent.getMessageCreateEvent().getMessage()
-                .getChannel()
-                .flatMap(channel -> channel.createMessage("Pong!"))
-                .then());
-    }
-
     private final HeartBeats heartBeats;
 
     public BobJr(@Nullable final String token) {
@@ -190,6 +183,10 @@ public class BobJr {
         commands.put("quit", basicCommands::leaveCommand);
         commands.put("leave", basicCommands::leaveCommand);
         commands.put("stop", basicCommands::stop);
+        commands.put("ping", intent -> intent.getMessageCreateEvent().getMessage()
+                .getChannel()
+                .flatMap(channel -> channel.createMessage("Pong!"))
+                .then());
 
         // test commands
         commands.put("play-announcement-track", playerCommands::playAnnouncementTrack);
