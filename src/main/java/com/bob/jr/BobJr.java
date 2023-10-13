@@ -169,11 +169,14 @@ public class BobJr {
     }
 
     public ServerResources setupPlayerAndCommands(final TextToSpeech tts, final GatewayDiscordClient client) {
-        // setup audio player
+        // setup audio player manager
         final AudioPlayerManager playerManager = setupAudioPlayerManager();
 
+        // setup audio player
         final AudioPlayer player = playerManager.createPlayer();
         player.setVolume(50);
+
+        // setup announcement player
         final AudioPlayer announcementPlayer = playerManager.createPlayer();
         announcementPlayer.setPaused(true);
 
@@ -183,30 +186,20 @@ public class BobJr {
         // create scheduler
         final TrackScheduler scheduler = new TrackScheduler(player, announcementPlayer, audioTrackCache);
 
+        // setup server resources
         final AudioProvider provider = new LavaPlayerAudioProvider(player, announcementPlayer);
         final ServerResources serverResources = new ServerResources(provider, scheduler, client, player, playerManager, tts, audioTrackCache);
-        final BasicCommands basicCommands = new BasicCommands(serverResources);
-        final PlayerCommands playerCommands = new PlayerCommands(serverResources);
-        final VoiceCommands voiceCommands = new VoiceCommands(serverResources);
 
-        // basic commands
-        commands.put("join", basicCommands::joinCommand);
-        commands.put("quit", basicCommands::leaveCommand);
-        commands.put("leave", basicCommands::leaveCommand);
-        commands.put("stop", basicCommands::stop);
+        // setup commands
+        setupBasicCommands(serverResources);
+        setupPlayerCommands(serverResources);
+        setupVoiceCommands(serverResources);
 
         // test commands
-        commands.put("play-announcement-track", playerCommands::playAnnouncementTrack);
         commands.put("ping", intent -> intent.getMessageCreateEvent().getMessage()
                 .getChannel()
                 .flatMap(channel -> channel.createMessage("Pong!"))
                 .then());
-
-        // player commands
-        commands.put("play", playerCommands::play);
-        commands.put("search", playerCommands::search);
-        commands.put("playlist", playerCommands::playlist);
-        commands.put("volume", playerCommands::setVolume);
 
         // rick
         commands.put("rick", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
@@ -215,6 +208,34 @@ public class BobJr {
                 .flatMap(channel -> channel.join(spec -> spec.setProvider(provider)))
                 .doOnSuccess(connection -> playerManager.loadItem("https://www.youtube.com/watch?v=dQw4w9WgXcQ", scheduler))
                 .then());
+
+        return serverResources;
+    }
+
+    private static void setupBasicCommands(ServerResources serverResources) {
+        final BasicCommands basicCommands = new BasicCommands(serverResources);
+
+        commands.put("join", basicCommands::joinCommand);
+        commands.put("quit", basicCommands::leaveCommand);
+        commands.put("leave", basicCommands::leaveCommand);
+        commands.put("stop", basicCommands::stop);
+    }
+
+    private static void setupPlayerCommands(ServerResources serverResources) {
+        final PlayerCommands playerCommands = new PlayerCommands(serverResources);
+
+        commands.put("play", playerCommands::play);
+        commands.put("search", playerCommands::search);
+        commands.put("playlist", playerCommands::playlist);
+        commands.put("volume", playerCommands::setVolume);
+
+        // test commands
+        commands.put("play-announcement-track", playerCommands::playAnnouncementTrack);
+
+    }
+
+    private static void setupVoiceCommands(ServerResources serverResources) {
+        final VoiceCommands voiceCommands = new VoiceCommands(serverResources);
 
         // get voices
         commands.put("voices", voiceCommands::voices);
@@ -225,8 +246,6 @@ public class BobJr {
 
         // tts
         commands.put("tts", voiceCommands::tts);
-
-        return serverResources;
     }
 
     private static AudioPlayerManager setupAudioPlayerManager() {
