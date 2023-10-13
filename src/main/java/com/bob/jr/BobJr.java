@@ -58,7 +58,7 @@ public class BobJr {
         final TextToSpeech tts = setupTextToSpeech();
 
         // try to get secret
-        String secretToken = getSecretToken(token);
+        final String secretToken = getSecretToken(token);
 
         // setup Discord client
         final GatewayDiscordClient client = setupDiscordClient(token, secretToken);
