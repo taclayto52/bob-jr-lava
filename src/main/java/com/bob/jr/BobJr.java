@@ -43,7 +43,6 @@ public class BobJr {
 
     private static final Map<String, Command> commands = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(BobJr.class);
-    private static final Set<VoidCommand> errorMessages = new HashSet<>();
     private static final String PROJECT_ID = "937970633558"; // load these from environment var
     private static final String TOKEN_SECRET_ID = "discord-api-key";
     private static final String TOKEN_SECRET_VERSION = "1";
