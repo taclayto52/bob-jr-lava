@@ -69,7 +69,8 @@ public class BobJr {
         // setup Channel Watcher
         final ChannelWatcher channelWatcher = new ChannelWatcher(serverResources);
 
-        registerEventsAndMemberListener(client, channelWatcher);
+        registerDiscordClientEvents(client);
+        registerDiscordClientMemberListener(client, channelWatcher);
 
         // add heartbeats
         heartBeats = new HeartBeats();
@@ -80,20 +81,19 @@ public class BobJr {
         heartBeats.stopAsync();
     }
 
-    private void registerEventsAndMemberListener(GatewayDiscordClient client, ChannelWatcher channelWatcher) {
-        // register events
+    private static void registerDiscordClientMemberListener(GatewayDiscordClient client, ChannelWatcher channelWatcher) {
+        client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
+                .flatMap(channelWatcher::voiceStateUpdateEventHandler)
+                .subscribe();
+    }
+
+    private void registerDiscordClientEvents(GatewayDiscordClient client) {
         client.getEventDispatcher().on(MessageCreateEvent.class)
                 .flatMap(this::maybeGetGuildRoles)
                 .flatMap(event -> Mono.just(event.getMessage().getContent())
                         .filter(content -> checkAndReturnBotName(content, event) != null)
                         .map(content -> extractIntent(content, event))
                         .flatMap(this::handleMessageCreateEvent))
-                .subscribe();
-
-
-        // register member listener
-        client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
-                .flatMap(channelWatcher::voiceStateUpdateEventHandler)
                 .subscribe();
     }
 
