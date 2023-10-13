@@ -195,7 +195,7 @@ public class BobJr {
         setupPlayerCommands(serverResources);
         setupVoiceCommands(serverResources);
 
-        // test commands
+        // ping
         commands.put("ping", intent -> intent.getMessageCreateEvent().getMessage()
                 .getChannel()
                 .flatMap(channel -> channel.createMessage("Pong!"))
