@@ -58,20 +58,7 @@ public class BobJr {
         final TextToSpeech tts = setupTextToSpeech();
 
         // try to get secret
-        String secretToken = null;
-        if (token == null) {
-            try {
-                final SecretManagerServiceClient secretClient = SecretManagerServiceClient.create();
-                final AccessSecretVersionResponse response = secretClient.accessSecretVersion(SecretVersionName.newBuilder()
-                        .setProject(PROJECT_ID)
-                        .setSecret(TOKEN_SECRET_ID)
-                        .setSecretVersion(TOKEN_SECRET_VERSION)
-                        .build());
-                secretToken = response.getPayload().getData().toStringUtf8();
-            } catch (final IOException e) {
-                e.printStackTrace();
-            }
-        }
+        String secretToken = getSecretToken(token);
 
         // setup Discord client
         final GatewayDiscordClient client = setupDiscordClient(token, secretToken);
@@ -104,6 +91,24 @@ public class BobJr {
         // block until disconnect
         client.onDisconnect().block();
         heartBeats.stopAsync();
+    }
+
+    private static String getSecretToken(String token) {
+        String secretToken = null;
+        if (token == null) {
+            try {
+                final SecretManagerServiceClient secretClient = SecretManagerServiceClient.create();
+                final AccessSecretVersionResponse response = secretClient.accessSecretVersion(SecretVersionName.newBuilder()
+                        .setProject(PROJECT_ID)
+                        .setSecret(TOKEN_SECRET_ID)
+                        .setSecretVersion(TOKEN_SECRET_VERSION)
+                        .build());
+                secretToken = response.getPayload().getData().toStringUtf8();
+            } catch (final IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return secretToken;
     }
 
     private static GatewayDiscordClient setupDiscordClient(String token, String secretToken) {
