@@ -143,7 +143,7 @@ public class BobJr {
         }
     }
 
-    public static TextToSpeech setupTextToSpeech() {
+    private static TextToSpeech setupTextToSpeech() {
         TextToSpeech tts = null;
         try {
             tts = new TextToSpeech();
@@ -153,13 +153,13 @@ public class BobJr {
         return tts;
     }
 
-    public Mono<MessageCreateEvent> maybeGetGuildRoles(final MessageCreateEvent messageCreateEvent) {
+    private Mono<MessageCreateEvent> maybeGetGuildRoles(final MessageCreateEvent messageCreateEvent) {
         final var guild = messageCreateEvent.getGuild().block();
         botRoles.computeIfAbsent(guild, guild1 -> guild1.getSelfMember().block().getRoles().collectList().block());
         return Mono.just(messageCreateEvent);
     }
 
-    public Mono<Void> handleMessageCreateEvent(final Intent intent) {
+    private Mono<Void> handleMessageCreateEvent(final Intent intent) {
         return Flux.fromIterable(commands.entrySet())
                 .filter(entry -> intent.getIntentName().equals(entry.getKey()))
                 .flatMap(entry -> entry.getValue().execute(intent))
@@ -168,7 +168,7 @@ public class BobJr {
                 .next();
     }
 
-    public ServerResources setupPlayerAndCommands(final TextToSpeech tts, final GatewayDiscordClient client) {
+    private ServerResources setupPlayerAndCommands(final TextToSpeech tts, final GatewayDiscordClient client) {
         // setup audio player manager
         final AudioPlayerManager playerManager = setupAudioPlayerManager();
 
@@ -245,7 +245,7 @@ public class BobJr {
         return playerManager;
     }
 
-    public Intent extractIntent(final String incomingMessage, final MessageCreateEvent event) {
+    private Intent extractIntent(final String incomingMessage, final MessageCreateEvent event) {
         String containedBotName = checkAndReturnBotName(incomingMessage, event);
         if (containedBotName == null) {
             return null;
