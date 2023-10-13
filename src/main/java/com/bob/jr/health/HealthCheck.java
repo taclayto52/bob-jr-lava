@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.charset.StandardCharsets;
@@ -24,7 +25,7 @@ public class HealthCheck implements Runnable {
     boolean running;
 
     public HealthCheck(final int port) throws IOException {
-        final var networkInterface = NetworkInterface.getByName("eth0");
+        NetworkInterface networkInterface = getNetworkInterface();
 
         final var internalHostAddress = networkInterface.getInterfaceAddresses().stream()
                 .map(interfaceAddress -> interfaceAddress.getAddress().getHostAddress())
@@ -36,6 +37,22 @@ public class HealthCheck implements Runnable {
         final var inetSocketAddress = new InetSocketAddress(internalHostAddress, port);
         serverSocket = AsynchronousServerSocketChannel.open().bind(inetSocketAddress);
         running = true;
+    }
+
+    private NetworkInterface getNetworkInterface() throws SocketException {
+        NetworkInterface networkInterface;
+
+        // be kind to our MacOS frens
+        if (isMac()) {
+            networkInterface = NetworkInterface.getByName("en0");
+        } else {
+            networkInterface = NetworkInterface.getByName("eth0");
+        }
+        return networkInterface;
+    }
+
+    private boolean isMac() {
+        return System.getProperty("os.name").contains("Mac");
     }
 
     @Override
