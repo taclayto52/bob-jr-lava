@@ -195,12 +195,6 @@ public class BobJr {
         setupPlayerCommands(serverResources);
         setupVoiceCommands(serverResources);
 
-        // ping
-        commands.put("ping", intent -> intent.getMessageCreateEvent().getMessage()
-                .getChannel()
-                .flatMap(channel -> channel.createMessage("Pong!"))
-                .then());
-
         // rick
         commands.put("rick", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
                 .flatMap(Member::getVoiceState)
@@ -215,6 +209,7 @@ public class BobJr {
     private static void setupBasicCommands(ServerResources serverResources) {
         final BasicCommands basicCommands = new BasicCommands(serverResources);
 
+        commands.put("ping", basicCommands::pingCommand);
         commands.put("join", basicCommands::joinCommand);
         commands.put("quit", basicCommands::leaveCommand);
         commands.put("leave", basicCommands::leaveCommand);
