@@ -81,6 +81,14 @@ public class BobJr {
         heartBeats.stopAsync();
     }
 
+    public static void main(final String[] args) {
+        final Optional<String> optionalSecret = args.length > 0 ?
+                Optional.ofNullable(args[0]) :
+                Optional.ofNullable(System.getenv("BOB_JR_DISCORD_AUTH_KEY"));
+
+        new BobJr(optionalSecret.orElse(null));
+    }
+
     private static void registerDiscordClientMemberListener(GatewayDiscordClient client, ChannelWatcher channelWatcher) {
         client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
                 .flatMap(channelWatcher::voiceStateUpdateEventHandler)
@@ -133,14 +141,6 @@ public class BobJr {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public static void main(final String[] args) {
-        final Optional<String> optionalSecret = args.length > 0 ?
-                Optional.ofNullable(args[0]) :
-                Optional.ofNullable(System.getenv("BOB_JR_DISCORD_AUTH_KEY"));
-
-        new BobJr(optionalSecret.orElse(null));
     }
 
     public static TextToSpeech setupTextToSpeech() {
