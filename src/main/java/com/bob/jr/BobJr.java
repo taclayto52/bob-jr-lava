@@ -73,15 +73,8 @@ public class BobJr {
             }
         }
 
-        // setup client
-        final String tokenProvided = secretToken == null ? token : secretToken;
-        final GatewayDiscordClient client = DiscordClientBuilder.create(tokenProvided).build()
-                .login()
-                .block();
-        botName = client.getSelf().block().getMention();
-        final StringBuffer nickNameBuffer = new StringBuffer(botName);
-        final int indexOfAt = nickNameBuffer.indexOf("@");
-        botNickName = nickNameBuffer.replace(indexOfAt, indexOfAt + 1, "@!").toString();
+        // setup Discord client
+        final GatewayDiscordClient client = setupDiscordClient(token, secretToken);
 
         // setup commands
         final ServerResources serverResources = setupPlayerAndCommands(tts, client);
@@ -111,6 +104,18 @@ public class BobJr {
         // block until disconnect
         client.onDisconnect().block();
         heartBeats.stopAsync();
+    }
+
+    private static GatewayDiscordClient setupDiscordClient(String token, String secretToken) {
+        final String tokenProvided = secretToken == null ? token : secretToken;
+        final GatewayDiscordClient client = DiscordClientBuilder.create(tokenProvided).build()
+                .login()
+                .block();
+        botName = client.getSelf().block().getMention();
+        final StringBuffer nickNameBuffer = new StringBuffer(botName);
+        final int indexOfAt = nickNameBuffer.indexOf("@");
+        botNickName = nickNameBuffer.replace(indexOfAt, indexOfAt + 1, "@!").toString();
+        return client;
     }
 
     private static void setupHealthChecks() {
