@@ -194,13 +194,13 @@ public class BobJr {
         commands.put("quit", basicCommands::leaveCommand);
         commands.put("leave", basicCommands::leaveCommand);
         commands.put("stop", basicCommands::stop);
+
+        // test commands
+        commands.put("play-announcement-track", playerCommands::playAnnouncementTrack);
         commands.put("ping", intent -> intent.getMessageCreateEvent().getMessage()
                 .getChannel()
                 .flatMap(channel -> channel.createMessage("Pong!"))
                 .then());
-
-        // test commands
-        commands.put("play-announcement-track", playerCommands::playAnnouncementTrack);
 
         // player commands
         commands.put("play", playerCommands::play);
