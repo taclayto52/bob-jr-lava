@@ -192,16 +192,8 @@ public class BobJr {
 
         // setup commands
         setupBasicCommands(serverResources);
-        setupPlayerCommands(serverResources);
+        setupPlayerCommands(serverResources, playerManager, scheduler);
         setupVoiceCommands(serverResources);
-
-        // rick
-        commands.put("rick", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
-                .flatMap(Member::getVoiceState)
-                .flatMap(VoiceState::getChannel)
-                .flatMap(channel -> channel.join(spec -> spec.setProvider(provider)))
-                .doOnSuccess(connection -> playerManager.loadItem("https://www.youtube.com/watch?v=dQw4w9WgXcQ", scheduler))
-                .then());
 
         return serverResources;
     }
@@ -216,13 +208,14 @@ public class BobJr {
         commands.put("stop", basicCommands::stop);
     }
 
-    private static void setupPlayerCommands(ServerResources serverResources) {
-        final PlayerCommands playerCommands = new PlayerCommands(serverResources);
+    private static void setupPlayerCommands(ServerResources serverResources, AudioPlayerManager playerManager, TrackScheduler scheduler) {
+        final PlayerCommands playerCommands = new PlayerCommands(serverResources, playerManager, scheduler);
 
         commands.put("play", playerCommands::play);
         commands.put("search", playerCommands::search);
         commands.put("playlist", playerCommands::playlist);
         commands.put("volume", playerCommands::setVolume);
+        commands.put("rickroll", playerCommands::rickRoll);
 
         // test commands
         commands.put("play-announcement-track", playerCommands::playAnnouncementTrack);

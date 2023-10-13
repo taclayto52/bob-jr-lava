@@ -1,8 +1,10 @@
 package com.bob.jr.commands;
 
 import com.bob.jr.Intent;
+import com.bob.jr.TrackScheduler;
 import com.bob.jr.channelevents.ChannelWatcher;
 import com.bob.jr.utils.ServerResources;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import discord4j.core.object.VoiceState;
 import discord4j.core.object.entity.Member;
@@ -20,10 +22,14 @@ import static com.bob.jr.utils.LimitsHelper.PLAYLIST_RETURN_LIMIT;
 public class PlayerCommands {
 
     private final ServerResources serverResources;
+    private final AudioPlayerManager playerManager;
+    private final TrackScheduler scheduler;
     private final Logger logger = LoggerFactory.getLogger(PlayerCommands.class.getName());
 
-    public PlayerCommands(final ServerResources serverResources) {
+    public PlayerCommands(final ServerResources serverResources, AudioPlayerManager playerManager, TrackScheduler scheduler) {
         this.serverResources = serverResources;
+        this.playerManager = playerManager;
+        this.scheduler = scheduler;
     }
 
     public Mono<Void> setVolume(final Intent intent) {
@@ -65,6 +71,14 @@ public class PlayerCommands {
                 .flatMap(VoiceState::getChannel)
                 .flatMap(channel -> channel.join(spec -> spec.setProvider(serverResources.getServerAudioProvider())))
                 .doOnSuccess(voided -> serverResources.getAudioPlayerManager().loadItem(String.format("ytsearch:%s", intent.getIntentContext()), serverResources.getTrackScheduler()))
+                .then();
+    }
+
+    public Mono<Void> rickRoll(final Intent intent) {
+        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
+                .flatMap(Member::getVoiceState)
+                .flatMap(VoiceState::getChannel)
+                .doOnSuccess(connection -> playerManager.loadItem("https://www.youtube.com/watch?v=dQw4w9WgXcQ", scheduler))
                 .then();
     }
 
