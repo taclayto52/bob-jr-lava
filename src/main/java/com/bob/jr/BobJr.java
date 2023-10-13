@@ -7,7 +7,6 @@ import com.bob.jr.commands.PlayerCommands;
 import com.bob.jr.commands.VoiceCommands;
 import com.bob.jr.health.HealthCheck;
 import com.bob.jr.interfaces.Command;
-import com.bob.jr.interfaces.VoidCommand;
 import com.bob.jr.utils.AudioTrackCache;
 import com.bob.jr.utils.ServerResources;
 import com.google.cloud.secretmanager.v1.AccessSecretVersionResponse;
@@ -53,12 +52,7 @@ public class BobJr {
     private final HeartBeats heartBeats;
 
     public BobJr(@Nullable final String token) {
-        // setup health checks
-        try {
-            new Thread(new HealthCheck(8080)).start();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        setupHealthChecks();
 
         // setup GCloud text to speech
         final TextToSpeech tts = setupTextToSpeech();
@@ -117,6 +111,14 @@ public class BobJr {
         // block until disconnect
         client.onDisconnect().block();
         heartBeats.stopAsync();
+    }
+
+    private static void setupHealthChecks() {
+        try {
+            new Thread(new HealthCheck(8080)).start();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public static void main(final String[] args) {
