@@ -69,6 +69,18 @@ public class BobJr {
         // setup Channel Watcher
         final ChannelWatcher channelWatcher = new ChannelWatcher(serverResources);
 
+        registerEventsAndMemberListener(client, channelWatcher);
+
+        // add heartbeats
+        heartBeats = new HeartBeats();
+        heartBeats.startAsync().awaitRunning();
+
+        // block until disconnect
+        client.onDisconnect().block();
+        heartBeats.stopAsync();
+    }
+
+    private void registerEventsAndMemberListener(GatewayDiscordClient client, ChannelWatcher channelWatcher) {
         // register events
         client.getEventDispatcher().on(MessageCreateEvent.class)
                 .flatMap(this::maybeGetGuildRoles)
@@ -83,14 +95,6 @@ public class BobJr {
         client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
                 .flatMap(channelWatcher::voiceStateUpdateEventHandler)
                 .subscribe();
-
-        // add heartbeats
-        heartBeats = new HeartBeats();
-        heartBeats.startAsync().awaitRunning();
-
-        // block until disconnect
-        client.onDisconnect().block();
-        heartBeats.stopAsync();
     }
 
     private static String getSecretToken(String token) {
