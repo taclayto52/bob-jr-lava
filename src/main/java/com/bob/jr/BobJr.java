@@ -170,11 +170,7 @@ public class BobJr {
 
     public ServerResources setupPlayerAndCommands(final TextToSpeech tts, final GatewayDiscordClient client) {
         // setup audio player
-        final AudioPlayerManager playerManager = new DefaultAudioPlayerManager();
-        playerManager.getConfiguration().setFrameBufferFactory(NonAllocatingAudioFrameBuffer::new);
-
-        AudioSourceManagers.registerRemoteSources(playerManager);
-        AudioSourceManagers.registerLocalSource(playerManager);
+        final AudioPlayerManager playerManager = setupAudioPlayerManager();
 
         final AudioPlayer player = playerManager.createPlayer();
         player.setVolume(50);
@@ -231,6 +227,15 @@ public class BobJr {
         commands.put("tts", voiceCommands::tts);
 
         return serverResources;
+    }
+
+    private static AudioPlayerManager setupAudioPlayerManager() {
+        final AudioPlayerManager playerManager = new DefaultAudioPlayerManager();
+        playerManager.getConfiguration().setFrameBufferFactory(NonAllocatingAudioFrameBuffer::new);
+
+        AudioSourceManagers.registerRemoteSources(playerManager);
+        AudioSourceManagers.registerLocalSource(playerManager);
+        return playerManager;
     }
 
     public Intent extractIntent(final String incomingMessage, final MessageCreateEvent event) {
