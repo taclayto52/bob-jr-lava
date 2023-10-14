@@ -28,8 +28,6 @@ public class TrackScheduler implements AudioLoadResultHandler {
     private final ConcurrentHashMap<String, AnnouncementTrack> announcementTracks = new ConcurrentHashMap<>();
     private final AudioTrackCache audioTrackCache;
 
-    private final AtomicBoolean isNextTrackAnnouncement = new AtomicBoolean(false);
-
     @Deprecated
     public TrackScheduler(final AudioPlayer player) {
         this(player, null, null);
