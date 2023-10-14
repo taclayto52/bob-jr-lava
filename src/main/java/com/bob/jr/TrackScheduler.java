@@ -43,7 +43,8 @@ public class TrackScheduler implements AudioLoadResultHandler {
 
     @Override
     public void trackLoaded(final AudioTrack track) {
-        handleTrackCache(track);
+        updateTrackCache(track);
+
         synchronized (announcementTracks) {
             final var announcementTrackKey = announcementTracks.keySet().stream()
                     .filter(announcementKey -> announcementKey.contains(track.getIdentifier()))
@@ -82,7 +83,7 @@ public class TrackScheduler implements AudioLoadResultHandler {
         }
     }
 
-    private void handleTrackCache(final AudioTrack track) {
+    private void updateTrackCache(final AudioTrack track) {
         if (audioTrackCache != null && !audioTrackCache.checkIfTrackIsPresent(track.getInfo().uri)) {
             audioTrackCache.addTrackToCache(track.getInfo().uri, track);
         }
