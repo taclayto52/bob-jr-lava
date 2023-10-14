@@ -69,13 +69,13 @@ public class TrackScheduler implements AudioLoadResultHandler {
                     }
                     announcementTracks.remove(announcementTrack.getTrackUrl());
                     announcementPlayer.stopTrack();
-                    setTrackPlayer();
+                    setTrackPlayerAsActive();
                 });
                 track.setMarker(trackMarker);
-                setAnnouncementPlayer();
+                setAnnouncementPlayerAsActive();
                 announcementPlayer.playTrack(track);
             } else {
-                setTrackPlayer();
+                setTrackPlayerAsActive();
                 player.stopTrack();
                 player.playTrack(track);
             }
@@ -116,12 +116,12 @@ public class TrackScheduler implements AudioLoadResultHandler {
         announcementTracks.putIfAbsent(announcementTrackKey, announcementTrack);
     }
 
-    public synchronized void setAnnouncementPlayer() {
+    public synchronized void setAnnouncementPlayerAsActive() {
         player.setPaused(true);
         announcementPlayer.setPaused(false);
     }
 
-    public synchronized void setTrackPlayer() {
+    public synchronized void setTrackPlayerAsActive() {
         announcementPlayer.setPaused(true);
         player.setPaused(false);
     }
