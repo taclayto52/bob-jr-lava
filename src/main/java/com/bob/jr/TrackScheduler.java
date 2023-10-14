@@ -20,15 +20,15 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TrackScheduler implements AudioLoadResultHandler {
 
     private final AudioPlayer defaultTrackPlayer;
-    private final AudioPlayer announcementPlayer;
+    private final AudioPlayer announcementTrackPlayer;
     private final Logger logger = LoggerFactory.getLogger(TrackScheduler.class.getName());
     private final Stack<AudioTrack> currentPlaylist = new Stack<>();
     private final ConcurrentHashMap<String, AnnouncementTrack> announcementTracks = new ConcurrentHashMap<>();
     private final AudioTrackCache audioTrackCache;
 
-    public TrackScheduler(final AudioPlayer defaultTrackPlayer, final AudioPlayer announcementPlayer, final AudioTrackCache audioTrackCache) {
+    public TrackScheduler(final AudioPlayer defaultTrackPlayer, final AudioPlayer announcementTrackPlayer, final AudioTrackCache audioTrackCache) {
         this.defaultTrackPlayer = defaultTrackPlayer;
-        this.announcementPlayer = announcementPlayer;
+        this.announcementTrackPlayer = announcementTrackPlayer;
         this.audioTrackCache = audioTrackCache;
     }
 
@@ -68,12 +68,12 @@ public class TrackScheduler implements AudioLoadResultHandler {
                         logger.debug(String.format("reached unknown marker state: %s", markerState));
                     }
                     announcementTracks.remove(announcementTrack.getTrackUrl());
-                    announcementPlayer.stopTrack();
+                    announcementTrackPlayer.stopTrack();
                     setTrackPlayerAsActive();
                 });
                 track.setMarker(trackMarker);
                 setAnnouncementPlayerAsActive();
-                announcementPlayer.playTrack(track);
+                announcementTrackPlayer.playTrack(track);
             } else {
                 setTrackPlayerAsActive();
                 defaultTrackPlayer.stopTrack();
@@ -118,11 +118,11 @@ public class TrackScheduler implements AudioLoadResultHandler {
 
     public synchronized void setAnnouncementPlayerAsActive() {
         defaultTrackPlayer.setPaused(true);
-        announcementPlayer.setPaused(false);
+        announcementTrackPlayer.setPaused(false);
     }
 
     public synchronized void setTrackPlayerAsActive() {
-        announcementPlayer.setPaused(true);
+        announcementTrackPlayer.setPaused(true);
         defaultTrackPlayer.setPaused(false);
     }
 
