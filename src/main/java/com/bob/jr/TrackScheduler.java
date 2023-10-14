@@ -16,8 +16,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Stack;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 
 public class TrackScheduler implements AudioLoadResultHandler {
 
