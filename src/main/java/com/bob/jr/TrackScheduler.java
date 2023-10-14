@@ -76,11 +76,15 @@ public class TrackScheduler implements AudioLoadResultHandler {
                 setAnnouncementPlayerAsActive();
                 announcementTrackPlayer.playTrack(track);
             } else {
-                setDefaultTrackPlayerAsActive();
-                defaultTrackPlayer.stopTrack();
-                defaultTrackPlayer.playTrack(track);
+                playTrackWithDefaultTrackPlayer(track);
             }
         }
+    }
+
+    private void playTrackWithDefaultTrackPlayer(AudioTrack track) {
+        setDefaultTrackPlayerAsActive();
+        defaultTrackPlayer.stopTrack();
+        defaultTrackPlayer.playTrack(track);
     }
 
     private void updateTrackCache(final AudioTrack track) {
