@@ -92,10 +92,13 @@ public class TrackScheduler implements AudioLoadResultHandler {
     public void playlistLoaded(final AudioPlaylist playlist) {
         // LavaPlayer found multiple AudioTracks from some playlist
         logger.info(String.format("playlist loaded: %s", playlist.getName()));
+
         defaultTrackPlayer.stopTrack();
         currentPlaylist.clear();
+
         currentPlaylist.addAll(playlist.getTracks());
         Collections.reverse(currentPlaylist);
+
         defaultTrackPlayer.playTrack(currentPlaylist.pop());
     }
 
