@@ -12,7 +12,6 @@ import discord4j.core.object.command.ApplicationCommandOption;
 import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.channel.MessageChannel;
-import discord4j.core.object.entity.channel.VoiceChannel;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.discordjson.json.ImmutableApplicationCommandOptionChoiceData;
@@ -275,7 +274,7 @@ public class VoiceCommands implements CommandRegistrar {
         if (joinChannel) {
             member.getVoiceState()
                     .flatMap(VoiceState::getChannel)
-                    .flatMap(VoiceChannel::join)
+                    .flatMap(serverResources::joinVoiceChannel)
                     .block();
         }
 

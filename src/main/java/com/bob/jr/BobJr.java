@@ -26,7 +26,6 @@ import discord4j.core.object.VoiceState;
 import discord4j.core.object.entity.Guild;
 import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.Role;
-import discord4j.core.object.entity.channel.VoiceChannel;
 import discord4j.voice.AudioProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -247,7 +246,7 @@ public class BobJr {
         commands.put("rick", intent -> Mono.justOrEmpty(intent.messageCreateEvent().getMember())
                 .flatMap(Member::getVoiceState)
                 .flatMap(VoiceState::getChannel)
-                .flatMap(VoiceChannel::join)
+                .flatMap(serverResources::joinVoiceChannel)
                 .doOnSuccess(connection -> playerManager.loadItem("https://www.youtube.com/watch?v=dQw4w9WgXcQ", scheduler))
                 .then());
 
