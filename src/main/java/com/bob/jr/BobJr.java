@@ -190,7 +190,7 @@ public class BobJr {
 
         // setup commands
         setupBasicCommands(serverResources);
-        setupPlayerCommands(serverResources, playerManager, scheduler);
+        setupPlayerCommands(serverResources);
         setupVoiceCommands(serverResources);
 
         return serverResources;
@@ -206,8 +206,8 @@ public class BobJr {
         commands.put("stop", basicCommands::stop);
     }
 
-    private static void setupPlayerCommands(ServerResources serverResources, AudioPlayerManager playerManager, TrackScheduler scheduler) {
-        final PlayerCommands playerCommands = new PlayerCommands(serverResources, playerManager, scheduler);
+    private static void setupPlayerCommands(ServerResources serverResources) {
+        final PlayerCommands playerCommands = new PlayerCommands(serverResources);
 
         commands.put("play", playerCommands::play);
         commands.put("search", playerCommands::search);
