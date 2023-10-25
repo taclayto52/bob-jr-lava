@@ -5,6 +5,7 @@ import com.bob.jr.utils.ServerResources;
 import discord4j.common.util.Snowflake;
 import discord4j.core.object.VoiceState;
 import discord4j.core.object.entity.Member;
+import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.channel.VoiceChannel;
 import reactor.core.publisher.Mono;
 
@@ -16,6 +17,14 @@ public class BasicCommands {
 
     public BasicCommands(ServerResources serverResources) {
         this.serverResources = serverResources;
+    }
+
+
+    public Mono<Void> pingCommand(Intent intent) {
+        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
+                .flatMap(Message::getChannel)
+                .doOnSuccess(channel -> channel.createMessage("Pong!").block())
+                .then();
     }
 
     public Mono<Void> joinCommand(Intent intent) {
