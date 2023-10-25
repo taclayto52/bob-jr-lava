@@ -2,10 +2,9 @@ package com.bob.jr;
 
 import com.bob.jr.TextToSpeech.TextToSpeech;
 import com.bob.jr.channelevents.ChannelWatcher;
-import com.bob.jr.commands.BasicCommands;
-import com.bob.jr.commands.PlayerCommands;
-import com.bob.jr.commands.VoiceCommands;
+import com.bob.jr.commands.*;
 import com.bob.jr.health.HealthCheck;
+import com.bob.jr.interfaces.ApplicationCommandInterface;
 import com.bob.jr.interfaces.Command;
 import com.bob.jr.interfaces.VoidCommand;
 import com.bob.jr.utils.AudioTrackCache;
@@ -21,6 +20,7 @@ import com.sedmelluq.discord.lavaplayer.track.playback.NonAllocatingAudioFrameBu
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.VoiceStateUpdateEvent;
+import discord4j.core.event.domain.interaction.ApplicationCommandInteractionEvent;
 import discord4j.core.event.domain.message.MessageCreateEvent;
 import discord4j.core.object.VoiceState;
 import discord4j.core.object.entity.Guild;
@@ -29,6 +29,7 @@ import discord4j.core.object.entity.Role;
 import discord4j.voice.AudioProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -41,18 +42,19 @@ import static com.bob.jr.utils.FluxUtils.logFluxError;
 
 public class BobJr {
 
+    public static final String PROJECT_ID = "937970633558"; // load these from environment var
+    public static final String TOKEN_SECRET_ID = "discord-api-key";
+    public static final String TOKEN_SECRET_VERSION = "1";
     private static final Map<String, Command> commands = new HashMap<>();
+    private static final Map<String, ApplicationCommandInterface> applicationCommands = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(BobJr.class);
     private static final Set<VoidCommand> errorMessages = new HashSet<>();
-    private static final String PROJECT_ID = "937970633558"; // load these from environment var
-    private static final String TOKEN_SECRET_ID = "discord-api-key";
-    private static final String TOKEN_SECRET_VERSION = "1";
+    private static final ConcurrentHashMap<Guild, List<Role>> botRoles = new ConcurrentHashMap<>();
     private static String botName;
     private static String botNickName;
-    private static final ConcurrentHashMap<Guild, List<Role>> botRoles = new ConcurrentHashMap<>();
 
     static {
-        commands.put("ping", intent -> intent.getMessageCreateEvent().getMessage()
+        commands.put("ping", intent -> intent.messageCreateEvent().getMessage()
                 .getChannel()
                 .flatMap(channel -> channel.createMessage("Pong!"))
                 .then());
@@ -97,6 +99,10 @@ public class BobJr {
         final int indexOfAt = nickNameBuffer.indexOf("@");
         botNickName = nickNameBuffer.replace(indexOfAt, indexOfAt + 1, "@!").toString();
 
+        // get application id
+        final var applicationId = client.getApplicationInfo().block().getId();
+
+
         // setup commands
         final ServerResources serverResources = setupPlayerAndCommands(tts, client);
 
@@ -110,6 +116,25 @@ public class BobJr {
                         .filter(content -> checkAndReturnBotName(content, event) != null)
                         .map(content -> extractIntent(content, event))
                         .flatMap(this::handleMessageCreateEvent))
+                .subscribe();
+
+        // application command handlers
+        client.getEventDispatcher().on(ApplicationCommandInteractionEvent.class)
+                .flatMap(applicationCommandInteractionEvent -> {
+                    final var applicationCommand = getRegisteredCommandAction(applicationCommandInteractionEvent).orElseThrow();
+                    return applicationCommand.execute(applicationCommandInteractionEvent);
+                })
+                .subscribe();
+
+        client.getRestClient().getApplicationService().getGlobalApplicationCommands(applicationId.asLong())
+                .flatMap(applicationCommandData -> {
+                    logger.info(String.format("Got application command from global reg: %s", applicationCommandData.name()));
+                    return Mono.empty();
+                }).subscribe();
+
+        // register member listener
+        client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
+                .flatMap(channelWatcher::voiceStateUpdateEventHandler)
                 .subscribe();
 
 
@@ -145,6 +170,11 @@ public class BobJr {
         return tts;
     }
 
+    public static void logThrowableAndPrintStackTrace(final Throwable throwable) {
+        logger.error(String.format("Error: %s", throwable.getMessage()));
+        throwable.printStackTrace();
+    }
+
     public Mono<MessageCreateEvent> maybeGetGuildRoles(final MessageCreateEvent messageCreateEvent) {
         final var guild = messageCreateEvent.getGuild().block();
         botRoles.computeIfAbsent(guild, guild1 -> guild1.getSelfMember().block().getRoles().collectList().block());
@@ -153,11 +183,15 @@ public class BobJr {
 
     public Mono<Void> handleMessageCreateEvent(final Intent intent) {
         return Flux.fromIterable(commands.entrySet())
-                .filter(entry -> intent.getIntentName().equals(entry.getKey()))
+                .filter(entry -> intent.intentName().equals(entry.getKey()))
                 .flatMap(entry -> entry.getValue().execute(intent))
                 .doOnError(logFluxError(logger, "handleMessageCreateEvent"))
                 .onErrorComplete()
                 .next();
+    }
+
+    public Optional<ApplicationCommandInterface> getRegisteredCommandAction(final ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
+        return Optional.ofNullable(applicationCommands.get(applicationCommandInteractionEvent.getCommandName()));
     }
 
     public ServerResources setupPlayerAndCommands(final TextToSpeech tts, final GatewayDiscordClient client) {
@@ -181,44 +215,59 @@ public class BobJr {
 
         final AudioProvider provider = new LavaPlayerAudioProvider(player, announcementPlayer);
         final ServerResources serverResources = new ServerResources(provider, scheduler, client, player, playerManager, tts, audioTrackCache);
-        final BasicCommands basicCommands = new BasicCommands(serverResources);
-        final PlayerCommands playerCommands = new PlayerCommands(serverResources);
-        final VoiceCommands voiceCommands = new VoiceCommands(serverResources);
+        final CommandStore commandStore = new CommandStore(client);
+        final BasicCommands basicCommands = new BasicCommands(serverResources, commandStore);
+        final PlayerCommands playerCommands = new PlayerCommands(serverResources, commandStore);
+        final VoiceCommands voiceCommands = new VoiceCommands(serverResources, commandStore);
+
+        registerApplicationCommands(List.of(basicCommands, playerCommands, voiceCommands));
+
+        // register application commands
+        applicationCommands.putAll(basicCommands.getApplicationCommandInterfaces());
+        applicationCommands.putAll(playerCommands.getApplicationCommandInterfaces());
+        applicationCommands.putAll(voiceCommands.getApplicationCommandInterfaces());
 
         // basic commands
         commands.put("join", basicCommands::joinCommand);
         commands.put("quit", basicCommands::leaveCommand);
         commands.put("leave", basicCommands::leaveCommand);
-        commands.put("stop", basicCommands::stop);
+        commands.put("stop", basicCommands::stopCommand);
 
         // test commands
         commands.put("play-announcement-track", playerCommands::playAnnouncementTrack);
 
         // player commands
-        commands.put("play", playerCommands::play);
-        commands.put("search", playerCommands::search);
-        commands.put("playlist", playerCommands::playlist);
-        commands.put("volume", playerCommands::setVolume);
+        commands.put("play", playerCommands::playCommand);
+        commands.put("search", playerCommands::searchCommand);
+        commands.put("playlist", playerCommands::playlistCommand);
+        commands.put("volume", playerCommands::volumeCommand);
 
         // rick
-        commands.put("rick", intent -> Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
+        commands.put("rick", intent -> Mono.justOrEmpty(intent.messageCreateEvent().getMember())
                 .flatMap(Member::getVoiceState)
                 .flatMap(VoiceState::getChannel)
-                .flatMap(channel -> channel.join(spec -> spec.setProvider(provider)))
+                .flatMap(serverResources::joinVoiceChannel)
                 .doOnSuccess(connection -> playerManager.loadItem("https://www.youtube.com/watch?v=dQw4w9WgXcQ", scheduler))
                 .then());
 
         // get voices
-        commands.put("voices", voiceCommands::voices);
+        commands.put("voices", voiceCommands::voicesCommand);
         commands.put("myvoice-all", voiceCommands::myVoiceAll);
         commands.put("myvoice", voiceCommands::myVoice);
-        commands.put("pitch", voiceCommands::pitch);
+        commands.put("pitch", voiceCommands::pitchCommand);
         commands.put("speaking-rate", voiceCommands::speakingRate);
 
         // tts
-        commands.put("tts", voiceCommands::tts);
+        commands.put("tts", voiceCommands::ttsCommand);
 
         return serverResources;
+    }
+
+    private Disposable registerApplicationCommands(final List<CommandRegistrar> commandRegistrars) {
+        final var allCommandsRegistered = Flux.fromIterable(commandRegistrars).flatMap((commandRegistrar) -> Mono.just(commandRegistrar.registerCommands()))
+                .blockLast();
+        logger.info("All commands registered");
+        return allCommandsRegistered;
     }
 
     public Intent extractIntent(final String incomingMessage, final MessageCreateEvent event) {

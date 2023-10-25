@@ -16,7 +16,7 @@ public class AudioTrackCache {
     }
 
     public boolean checkIfTrackIsPresent(String key) {
-        return audioTrackCache.getIfPresent(key) != null;
+        return audioTrackCache.getIfPresent(key) == null;
     }
 
     public AudioTrack getTrackFromCache(String key) {

@@ -50,14 +50,14 @@ public class ChannelWatcher {
         } else {
             final String userName = member.getNickname().orElse(member.getDisplayName());
             final AnnouncementTrack announcementTrack = new AnnouncementTrack("synthString", member.getDisplayName(), contextAction);
-            serverResources.getTrackScheduler().addToAnnouncementTrackQueue(announcementTrack);
-            monoVoid = Mono.justOrEmpty(serverResources.getTextToSpeech().synthesizeTextMono(member, String.format("%s %s", userName, contextString)).block())
+            serverResources.trackScheduler().addToAnnouncementTrackQueue(announcementTrack);
+            monoVoid = Mono.justOrEmpty(serverResources.textToSpeech().synthesizeTextMono(member, String.format("%s %s", userName, contextString)).block())
                     .doOnNext(fileLocation -> {
-                        if (!serverResources.getAudioTrackCache().checkIfTrackIsPresent("synthString")) {
-                            serverResources.getAudioPlayerManager().loadItem(fileLocation, serverResources.getTrackScheduler());
+                        if (serverResources.audioTrackCache().checkIfTrackIsPresent("synthString")) {
+                            serverResources.audioPlayerManager().loadItem(fileLocation, serverResources.trackScheduler());
                         } else {
-                            final var cachedAudioTrack = serverResources.getAudioTrackCache().getTrackFromCache("synthString");
-                            serverResources.getTrackScheduler().trackLoaded(cachedAudioTrack);
+                            final var cachedAudioTrack = serverResources.audioTrackCache().getTrackFromCache("synthString");
+                            serverResources.trackScheduler().trackLoaded(cachedAudioTrack);
                         }
                     })
                     .doOnError(logFluxError(logger, "voiceStateUpdateEventHandler"))
@@ -71,14 +71,14 @@ public class ChannelWatcher {
     public static void playAnnouncementTrack(final String announcementUrl, final int startTime, final ServerResources serverResources) {
         final var trackStartTime = startTime == -1 ? new Random().nextInt(80) : startTime;
         final AnnouncementTrack announcementTrack = new AnnouncementTrack(announcementUrl, null, AnnouncementTrack.Actions.JOINED, trackStartTime, trackStartTime + 5);
-        serverResources.getTrackScheduler().addToAnnouncementTrackQueue(announcementTrack);
+        serverResources.trackScheduler().addToAnnouncementTrackQueue(announcementTrack);
 
-        if (!serverResources.getAudioTrackCache().checkIfTrackIsPresent(announcementUrl)) {
-            serverResources.getAudioPlayerManager().loadItem(announcementUrl, serverResources.getTrackScheduler());
+        if (serverResources.audioTrackCache().checkIfTrackIsPresent(announcementUrl)) {
+            serverResources.audioPlayerManager().loadItem(announcementUrl, serverResources.trackScheduler());
         } else {
             // TODO need to implement way of loading a file directly from memory instead of a file
-            final var cachedAudioTrack = serverResources.getAudioTrackCache().getTrackFromCache(announcementUrl);
-            serverResources.getTrackScheduler().trackLoaded(cachedAudioTrack);
+            final var cachedAudioTrack = serverResources.audioTrackCache().getTrackFromCache(announcementUrl);
+            serverResources.trackScheduler().trackLoaded(cachedAudioTrack);
         }
     }
 }
