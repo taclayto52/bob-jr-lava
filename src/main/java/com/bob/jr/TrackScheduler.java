@@ -52,9 +52,9 @@ public class TrackScheduler implements AudioLoadResultHandler {
             if (announcementTrackKey.isPresent()) {
                 final AnnouncementTrack announcementTrack = announcementTracks.get(announcementTrackKey.get());
 
-                final long setEndTime = setTrackStartAndEndTime(track, announcementTrack);
+                final long trackEndTime = getTrackEndTime(track, announcementTrack);
 
-                final TrackMarker trackMarker = getTrackMarker(setEndTime, announcementTrack);
+                final TrackMarker trackMarker = getTrackMarker(trackEndTime, announcementTrack);
 
                 track.setMarker(trackMarker);
                 setAnnouncementTrackPlayerAsActive();
@@ -81,7 +81,7 @@ public class TrackScheduler implements AudioLoadResultHandler {
         return trackMarker;
     }
 
-    private static long setTrackStartAndEndTime(AudioTrack track, AnnouncementTrack announcementTrack) {
+    private static long getTrackEndTime(AudioTrack track, AnnouncementTrack announcementTrack) {
         track.setPosition(Math.round(announcementTrack.getStartTime() * 1000));
         final long setEndTime;
         if (announcementTrack.getEndTime() == 0) {
