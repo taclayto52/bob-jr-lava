@@ -22,7 +22,7 @@ public class TrackScheduler implements AudioLoadResultHandler {
     private final AudioPlayer defaultTrackPlayer;
     private final AudioPlayer announcementTrackPlayer;
     private final Logger logger = LoggerFactory.getLogger(TrackScheduler.class.getName());
-    private final Stack<AudioTrack> currentPlaylist = new Stack<>();
+    private final Stack<AudioTrack> currentTrackPlaylist = new Stack<>();
     private final ConcurrentHashMap<String, AnnouncementTrack> announcementTracks = new ConcurrentHashMap<>();
     private final AudioTrackCache audioTrackCache;
 
@@ -32,13 +32,13 @@ public class TrackScheduler implements AudioLoadResultHandler {
         this.audioTrackCache = audioTrackCache;
     }
 
-    public void clearPlaylist() {
-        currentPlaylist.clear();
+    public void clearCurrentTrackPlaylist() {
+        currentTrackPlaylist.clear();
         defaultTrackPlayer.stopTrack();
     }
 
     public List<AudioTrack> getAudioTracks() {
-        return List.copyOf(currentPlaylist);
+        return List.copyOf(currentTrackPlaylist);
     }
 
     @Override
@@ -73,7 +73,7 @@ public class TrackScheduler implements AudioLoadResultHandler {
                     setDefaultTrackPlayerAsActive();
                 });
                 track.setMarker(trackMarker);
-                setAnnouncementPlayerAsActive();
+                setAnnouncementTrackPlayerAsActive();
                 announcementTrackPlayer.playTrack(track);
             } else {
                 playTrackWithDefaultTrackPlayer(track);
@@ -98,13 +98,12 @@ public class TrackScheduler implements AudioLoadResultHandler {
         // LavaPlayer found multiple AudioTracks from some playlist
         logger.info(String.format("playlist loaded: %s", playlist.getName()));
 
-        defaultTrackPlayer.stopTrack();
-        currentPlaylist.clear();
+        clearCurrentTrackPlaylist();
 
-        currentPlaylist.addAll(playlist.getTracks());
-        Collections.reverse(currentPlaylist);
+        currentTrackPlaylist.addAll(playlist.getTracks());
+        Collections.reverse(currentTrackPlaylist);
 
-        defaultTrackPlayer.playTrack(currentPlaylist.pop());
+        defaultTrackPlayer.playTrack(currentTrackPlaylist.pop());
     }
 
     @Override
@@ -124,7 +123,7 @@ public class TrackScheduler implements AudioLoadResultHandler {
         announcementTracks.putIfAbsent(announcementTrackKey, announcementTrack);
     }
 
-    public synchronized void setAnnouncementPlayerAsActive() {
+    public synchronized void setAnnouncementTrackPlayerAsActive() {
         defaultTrackPlayer.setPaused(true);
         announcementTrackPlayer.setPaused(false);
     }

@@ -38,7 +38,7 @@ public class BasicCommands {
     public Mono<Void> leaveCommand(Intent intent) {
         return Mono.justOrEmpty(intent.getMessageCreateEvent())
                 .flatMap(event -> {
-                    serverResources.getTrackScheduler().clearPlaylist();
+                    serverResources.getTrackScheduler().clearCurrentTrackPlaylist();
 
                     Snowflake guildSnow = event.getGuild().block().getId();
                     Optional<VoiceState> voiceStateOptional = Optional.ofNullable(serverResources.getGatewayDiscordClient().getMemberById(guildSnow, serverResources.getGatewayDiscordClient().getSelfId())
@@ -55,7 +55,7 @@ public class BasicCommands {
     // just stop for god's sake
     public Mono<Void> stop(Intent intent) {
         return Mono.justOrEmpty(serverResources.getAudioPlayer())
-                .doOnNext(thePlayer -> serverResources.getTrackScheduler().clearPlaylist())
+                .doOnNext(thePlayer -> serverResources.getTrackScheduler().clearCurrentTrackPlaylist())
                 .then();
     }
 
