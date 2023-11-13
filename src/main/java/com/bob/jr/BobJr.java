@@ -214,6 +214,7 @@ public class BobJr {
         commands.put("playlist", playerCommands::playlist);
         commands.put("volume", playerCommands::setVolume);
         commands.put("rickroll", playerCommands::rickRoll);
+        commands.put("roll", playerCommands::roll);
 
         // test commands
         commands.put("play-announcement-track", playerCommands::playAnnouncementTrack);
