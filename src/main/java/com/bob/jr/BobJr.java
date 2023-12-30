@@ -75,8 +75,8 @@ public class BobJr {
         heartBeats.startAsync().awaitRunning();
 
         // block until disconnect
-        client.onDisconnect().block();
-        heartBeats.stopAsync();
+        final var onDisconnectMono = client.onDisconnect();
+        onDisconnectMono.subscribe((voided) -> logger.info("client disconnected"));
     }
 
     public static void main(final String[] args) {
@@ -123,9 +123,12 @@ public class BobJr {
 
     private static GatewayDiscordClient setupDiscordClient(String token, String secretToken) {
         final String tokenProvided = secretToken == null ? token : secretToken;
+
+        logger.info("client logging in...");
         final GatewayDiscordClient client = DiscordClientBuilder.create(tokenProvided).build()
                 .login()
                 .block();
+        logger.info("client logged in!");
         botName = client.getSelf().block().getMention();
         final StringBuffer nickNameBuffer = new StringBuffer(botName);
         final int indexOfAt = nickNameBuffer.indexOf("@");
