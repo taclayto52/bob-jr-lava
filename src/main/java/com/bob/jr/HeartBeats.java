@@ -18,6 +18,6 @@ public class HeartBeats extends AbstractScheduledService {
 
     @Override
     protected Scheduler scheduler() {
-        return Scheduler.newFixedDelaySchedule(60, 30, TimeUnit.SECONDS);
+        return Scheduler.newFixedDelaySchedule(60, 60, TimeUnit.SECONDS);
     }
 }
