@@ -14,74 +14,77 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Stack;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 
 public class TrackScheduler implements AudioLoadResultHandler {
 
-    private final AudioPlayer player;
-    private final AudioPlayer announcementPlayer;
+    private final AudioPlayer defaultTrackPlayer;
+    private final AudioPlayer announcementTrackPlayer;
     private final Logger logger = LoggerFactory.getLogger(TrackScheduler.class.getName());
-    private final Stack<AudioTrack> currentPlaylist = new Stack<>();
+    private final Stack<AudioTrack> currentTrackPlaylist = new Stack<>();
     private final ConcurrentHashMap<String, AnnouncementTrack> announcementTracks = new ConcurrentHashMap<>();
     private final AudioTrackCache audioTrackCache;
 
-    private final AtomicBoolean isNextTrackAnnouncement = new AtomicBoolean(false);
-
-    @Deprecated
-    public TrackScheduler(final AudioPlayer player) {
-        this(player, null, null);
-    }
-
-    public TrackScheduler(final AudioPlayer player, final AudioPlayer announcementPlayer, final AudioTrackCache audioTrackCache) {
-        this.player = player;
-        this.announcementPlayer = announcementPlayer;
+    public TrackScheduler(final AudioPlayer defaultTrackPlayer, final AudioPlayer announcementTrackPlayer, final AudioTrackCache audioTrackCache) {
+        this.defaultTrackPlayer = defaultTrackPlayer;
+        this.announcementTrackPlayer = announcementTrackPlayer;
         this.audioTrackCache = audioTrackCache;
     }
 
-    public void clearPlaylist() {
-        currentPlaylist.clear();
-        player.stopTrack();
+    public void clearCurrentTrackPlaylist() {
+        currentTrackPlaylist.clear();
+        defaultTrackPlayer.stopTrack();
     }
 
     public List<AudioTrack> getAudioTracks() {
-        return List.copyOf(currentPlaylist);
+        return List.copyOf(currentTrackPlaylist);
     }
 
     @Override
     public void trackLoaded(final AudioTrack track) {
-        handleTrackCache(track);
+        updateTrackCache(track);
+
         synchronized (announcementTracks) {
-            final var announcementTrackKey = announcementTracks.keySet().stream()
-                    .filter(announcementKey -> announcementKey.contains(track.getIdentifier()))
-                    .findAny();
+            final var announcementTrackKey = getAnnouncementTrackKey(track);
+
             if (announcementTrackKey.isPresent()) {
                 final AnnouncementTrack announcementTrack = announcementTracks.get(announcementTrackKey.get());
 
-                // handle upcoming announcement
-                track.setPosition(Math.round(announcementTrack.getStartTime() * 1000));
-                final TrackMarker trackMarker = getTrackMarker(track, announcementTrack);
+                final long trackEndTime = getTrackEndTime(track, announcementTrack);
+
+                final TrackMarker trackMarker = getTrackMarker(trackEndTime, announcementTrack);
+
                 track.setMarker(trackMarker);
-                setAnnouncementPlayer();
-                announcementPlayer.playTrack(track);
+                setAnnouncementTrackPlayerAsActive();
+                announcementTrackPlayer.playTrack(track);
             } else {
-                setTrackPlayer();
-                player.stopTrack();
-                player.playTrack(track);
+                playTrackWithDefaultTrackPlayer(track);
             }
         }
     }
 
-    private TrackMarker getTrackMarker(AudioTrack track, AnnouncementTrack announcementTrack) {
+    private static long getTrackEndTime(AudioTrack track, AnnouncementTrack announcementTrack) {
+        track.setPosition(Math.round(announcementTrack.getStartTime() * 1000));
         final long setEndTime;
         if (announcementTrack.getEndTime() == 0) {
             setEndTime = track.getDuration();
         } else {
             setEndTime = Math.round(announcementTrack.getEndTime()) * 1000;
         }
-        return new TrackMarker(setEndTime, (markerState) -> {
+        return setEndTime;
+    }
+
+    private Optional<String> getAnnouncementTrackKey(AudioTrack track) {
+        final var announcementTrackKey = announcementTracks.keySet().stream()
+                .filter(announcementKey -> announcementKey.contains(track.getIdentifier()))
+                .findAny();
+        return announcementTrackKey;
+    }
+
+    private TrackMarker getTrackMarker(long setEndTime, AnnouncementTrack announcementTrack) {
+        final TrackMarker trackMarker = new TrackMarker(setEndTime, (markerState) -> {
             if (markerState == TrackMarkerHandler.MarkerState.REACHED) {
                 logger.debug("Marker has been reached");
             } else if (markerState == TrackMarkerHandler.MarkerState.ENDED) {
@@ -90,12 +93,19 @@ public class TrackScheduler implements AudioLoadResultHandler {
                 logger.debug(String.format("reached unknown marker state: %s", markerState));
             }
             announcementTracks.remove(announcementTrack.getTrackUrl());
-            announcementPlayer.stopTrack();
-            setTrackPlayer();
+            announcementTrackPlayer.stopTrack();
+            setDefaultTrackPlayerAsActive();
         });
+        return trackMarker;
     }
 
-    private void handleTrackCache(final AudioTrack track) {
+    private void playTrackWithDefaultTrackPlayer(AudioTrack track) {
+        setDefaultTrackPlayerAsActive();
+        defaultTrackPlayer.stopTrack();
+        defaultTrackPlayer.playTrack(track);
+    }
+
+    private void updateTrackCache(final AudioTrack track) {
         if (audioTrackCache != null && audioTrackCache.checkIfTrackIsPresent(track.getInfo().uri)) {
             audioTrackCache.addTrackToCache(track.getInfo().uri, track);
         }
@@ -105,11 +115,13 @@ public class TrackScheduler implements AudioLoadResultHandler {
     public void playlistLoaded(final AudioPlaylist playlist) {
         // LavaPlayer found multiple AudioTracks from some playlist
         logger.info(String.format("playlist loaded: %s", playlist.getName()));
-        player.stopTrack();
-        currentPlaylist.clear();
-        currentPlaylist.addAll(playlist.getTracks());
-        Collections.reverse(currentPlaylist);
-        player.playTrack(currentPlaylist.pop());
+
+        clearCurrentTrackPlaylist();
+
+        currentTrackPlaylist.addAll(playlist.getTracks());
+        Collections.reverse(currentTrackPlaylist);
+
+        defaultTrackPlayer.playTrack(currentTrackPlaylist.pop());
     }
 
     @Override
@@ -129,14 +141,14 @@ public class TrackScheduler implements AudioLoadResultHandler {
         announcementTracks.putIfAbsent(announcementTrackKey, announcementTrack);
     }
 
-    public synchronized void setAnnouncementPlayer() {
-        player.setPaused(true);
-        announcementPlayer.setPaused(false);
+    public synchronized void setAnnouncementTrackPlayerAsActive() {
+        defaultTrackPlayer.setPaused(true);
+        announcementTrackPlayer.setPaused(false);
     }
 
-    public synchronized void setTrackPlayer() {
-        announcementPlayer.setPaused(true);
-        player.setPaused(false);
+    public synchronized void setDefaultTrackPlayerAsActive() {
+        announcementTrackPlayer.setPaused(true);
+        defaultTrackPlayer.setPaused(false);
     }
 
 }

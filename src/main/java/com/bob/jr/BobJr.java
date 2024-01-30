@@ -6,7 +6,6 @@ import com.bob.jr.commands.*;
 import com.bob.jr.health.HealthCheck;
 import com.bob.jr.interfaces.ApplicationCommandInterface;
 import com.bob.jr.interfaces.Command;
-import com.bob.jr.interfaces.VoidCommand;
 import com.bob.jr.utils.AudioTrackCache;
 import com.bob.jr.utils.ServerResources;
 import com.google.cloud.secretmanager.v1.AccessSecretVersionResponse;
@@ -22,9 +21,7 @@ import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.VoiceStateUpdateEvent;
 import discord4j.core.event.domain.interaction.ApplicationCommandInteractionEvent;
 import discord4j.core.event.domain.message.MessageCreateEvent;
-import discord4j.core.object.VoiceState;
 import discord4j.core.object.entity.Guild;
-import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.Role;
 import discord4j.voice.AudioProvider;
 import org.slf4j.Logger;
@@ -48,7 +45,6 @@ public class BobJr {
     private static final Map<String, Command> commands = new HashMap<>();
     private static final Map<String, ApplicationCommandInterface> applicationCommands = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(BobJr.class);
-    private static final Set<VoidCommand> errorMessages = new HashSet<>();
     private static final ConcurrentHashMap<Guild, List<Role>> botRoles = new ConcurrentHashMap<>();
     private static String botName;
     private static String botNickName;
@@ -63,17 +59,60 @@ public class BobJr {
     private final HeartBeats heartBeats;
 
     public BobJr(@Nullable final String token) {
-        // setup health checks
-        try {
-            new Thread(new HealthCheck(8080)).start();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        setupHealthChecks();
 
         // setup GCloud text to speech
         final TextToSpeech tts = setupTextToSpeech();
 
         // try to get secret
+        final String secretToken = getSecretToken(token);
+
+        // setup Discord client
+        final GatewayDiscordClient client = setupDiscordClient(token, secretToken);
+
+        // setup commands
+        final ServerResources serverResources = setupPlayerAndCommands(tts, client);
+
+        // setup Channel Watcher
+        final ChannelWatcher channelWatcher = new ChannelWatcher(serverResources);
+
+        registerDiscordClientEvents(client);
+        registerDiscordClientMemberListener(client, channelWatcher);
+
+        // add heartbeats
+        heartBeats = new HeartBeats();
+        heartBeats.startAsync().awaitRunning();
+
+        // block until disconnect
+        final var onDisconnectMono = client.onDisconnect();
+        onDisconnectMono.subscribe((voided) -> logger.info("client disconnected"));
+    }
+
+    public static void main(final String[] args) {
+        final Optional<String> optionalSecret = args.length > 0 ?
+                Optional.ofNullable(args[0]) :
+                Optional.ofNullable(System.getenv("BOB_JR_DISCORD_AUTH_KEY"));
+
+        new BobJr(optionalSecret.orElse(null));
+    }
+
+    private static void registerDiscordClientMemberListener(GatewayDiscordClient client, ChannelWatcher channelWatcher) {
+        client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
+                .flatMap(channelWatcher::voiceStateUpdateEventHandler)
+                .subscribe();
+    }
+
+    private void registerDiscordClientEvents(GatewayDiscordClient client) {
+        client.getEventDispatcher().on(MessageCreateEvent.class)
+                .flatMap(this::maybeGetGuildRoles)
+                .flatMap(event -> Mono.just(event.getMessage().getContent())
+                        .filter(content -> checkAndReturnBotName(content, event) != null)
+                        .map(content -> extractIntent(content, event))
+                        .flatMap(this::handleMessageCreateEvent))
+                .subscribe();
+    }
+
+    private static String getSecretToken(String token) {
         String secretToken = null;
         if (token == null) {
             try {
@@ -88,12 +127,17 @@ public class BobJr {
                 e.printStackTrace();
             }
         }
+        return secretToken;
+    }
 
-        // setup client
+    private static GatewayDiscordClient setupDiscordClient(String token, String secretToken) {
         final String tokenProvided = secretToken == null ? token : secretToken;
+
+        logger.info("client logging in...");
         final GatewayDiscordClient client = DiscordClientBuilder.create(tokenProvided).build()
                 .login()
                 .block();
+        logger.info("client logged in!");
         botName = client.getSelf().block().getMention();
         final StringBuffer nickNameBuffer = new StringBuffer(botName);
         final int indexOfAt = nickNameBuffer.indexOf("@");
@@ -101,7 +145,6 @@ public class BobJr {
 
         // get application id
         final var applicationId = client.getApplicationInfo().block().getId();
-
 
         // setup commands
         final ServerResources serverResources = setupPlayerAndCommands(tts, client);
@@ -117,6 +160,7 @@ public class BobJr {
                         .map(content -> extractIntent(content, event))
                         .flatMap(this::handleMessageCreateEvent))
                 .subscribe();
+
 
         // application command handlers
         client.getEventDispatcher().on(ApplicationCommandInteractionEvent.class)
@@ -137,12 +181,6 @@ public class BobJr {
                 .flatMap(channelWatcher::voiceStateUpdateEventHandler)
                 .subscribe();
 
-
-        // register member listener
-        client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
-                .flatMap(channelWatcher::voiceStateUpdateEventHandler)
-                .subscribe();
-
         // add heartbeats
         heartBeats = new HeartBeats();
         heartBeats.startAsync().awaitRunning();
@@ -152,15 +190,15 @@ public class BobJr {
         heartBeats.stopAsync();
     }
 
-    public static void main(final String[] args) {
-        final Optional<String> optionalSecret = args.length > 0 ?
-                Optional.ofNullable(args[0]) :
-                Optional.ofNullable(System.getenv("BOB_JR_DISCORD_AUTH_KEY"));
-
-        new BobJr(optionalSecret.orElse(null));
+    private static void setupHealthChecks() {
+        try {
+            new Thread(new HealthCheck(8080)).start();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public static TextToSpeech setupTextToSpeech() {
+    private static TextToSpeech setupTextToSpeech() {
         TextToSpeech tts = null;
         try {
             tts = new TextToSpeech();
@@ -175,13 +213,13 @@ public class BobJr {
         throwable.printStackTrace();
     }
 
-    public Mono<MessageCreateEvent> maybeGetGuildRoles(final MessageCreateEvent messageCreateEvent) {
+    private Mono<MessageCreateEvent> maybeGetGuildRoles(final MessageCreateEvent messageCreateEvent) {
         final var guild = messageCreateEvent.getGuild().block();
         botRoles.computeIfAbsent(guild, guild1 -> guild1.getSelfMember().block().getRoles().collectList().block());
         return Mono.just(messageCreateEvent);
     }
 
-    public Mono<Void> handleMessageCreateEvent(final Intent intent) {
+    private Mono<Void> handleMessageCreateEvent(final Intent intent) {
         return Flux.fromIterable(commands.entrySet())
                 .filter(entry -> intent.intentName().equals(entry.getKey()))
                 .flatMap(entry -> entry.getValue().execute(intent))
@@ -194,16 +232,15 @@ public class BobJr {
         return Optional.ofNullable(applicationCommands.get(applicationCommandInteractionEvent.getCommandName()));
     }
 
-    public ServerResources setupPlayerAndCommands(final TextToSpeech tts, final GatewayDiscordClient client) {
+    private ServerResources setupPlayerAndCommands(final TextToSpeech tts, final GatewayDiscordClient client) {
+        // setup audio player manager
+        final AudioPlayerManager playerManager = setupAudioPlayerManager();
+
         // setup audio player
-        final AudioPlayerManager playerManager = new DefaultAudioPlayerManager();
-        playerManager.getConfiguration().setFrameBufferFactory(NonAllocatingAudioFrameBuffer::new);
-
-        AudioSourceManagers.registerRemoteSources(playerManager);
-        AudioSourceManagers.registerLocalSource(playerManager);
-
         final AudioPlayer player = playerManager.createPlayer();
         player.setVolume(50);
+
+        // setup announcement player
         final AudioPlayer announcementPlayer = playerManager.createPlayer();
         announcementPlayer.setPaused(true);
 
@@ -213,12 +250,9 @@ public class BobJr {
         // create scheduler
         final TrackScheduler scheduler = new TrackScheduler(player, announcementPlayer, audioTrackCache);
 
+        // setup server resources
         final AudioProvider provider = new LavaPlayerAudioProvider(player, announcementPlayer);
         final ServerResources serverResources = new ServerResources(provider, scheduler, client, player, playerManager, tts, audioTrackCache);
-        final CommandStore commandStore = new CommandStore(client);
-        final BasicCommands basicCommands = new BasicCommands(serverResources, commandStore);
-        final PlayerCommands playerCommands = new PlayerCommands(serverResources, commandStore);
-        final VoiceCommands voiceCommands = new VoiceCommands(serverResources, commandStore);
 
         registerApplicationCommands(List.of(basicCommands, playerCommands, voiceCommands));
 
@@ -227,28 +261,44 @@ public class BobJr {
         applicationCommands.putAll(playerCommands.getApplicationCommandInterfaces());
         applicationCommands.putAll(voiceCommands.getApplicationCommandInterfaces());
 
-        // basic commands
+        commands.put("ping", basicCommands::pingCommand);
+
+        // setup commands
+        final CommandStore commandStore = new CommandStore(client);
+        setupBasicCommands(serverResources);
+        setupPlayerCommands(serverResources);
+        setupVoiceCommands(serverResources);
+
+        return serverResources;
+    }
+
+    private static void setupBasicCommands(ServerResources serverResources) {
+        final BasicCommands basicCommands = new BasicCommands(serverResources);
+
+        commands.put("ping", basicCommands::pingCommand);
         commands.put("join", basicCommands::joinCommand);
         commands.put("quit", basicCommands::leaveCommand);
         commands.put("leave", basicCommands::leaveCommand);
-        commands.put("stop", basicCommands::stopCommand);
+        commands.put("stop", basicCommands::stop);
+    }
 
-        // test commands
-        commands.put("play-announcement-track", playerCommands::playAnnouncementTrack);
+    private static void setupPlayerCommands(ServerResources serverResources) {
+        final PlayerCommands playerCommands = new PlayerCommands(serverResources);
 
-        // player commands
         commands.put("play", playerCommands::playCommand);
         commands.put("search", playerCommands::searchCommand);
         commands.put("playlist", playerCommands::playlistCommand);
         commands.put("volume", playerCommands::volumeCommand);
+        commands.put("rickroll", playerCommands::rickRoll);
+        commands.put("roll", playerCommands::roll);
 
-        // rick
-        commands.put("rick", intent -> Mono.justOrEmpty(intent.messageCreateEvent().getMember())
-                .flatMap(Member::getVoiceState)
-                .flatMap(VoiceState::getChannel)
-                .flatMap(serverResources::joinVoiceChannel)
-                .doOnSuccess(connection -> playerManager.loadItem("https://www.youtube.com/watch?v=dQw4w9WgXcQ", scheduler))
-                .then());
+        // test commands
+        commands.put("play-announcement-track", playerCommands::playAnnouncementTrack);
+    }
+
+
+    private static void setupVoiceCommands(ServerResources serverResources) {
+        final VoiceCommands voiceCommands = new VoiceCommands(serverResources);
 
         // get voices
         commands.put("voices", voiceCommands::voicesCommand);
@@ -259,8 +309,15 @@ public class BobJr {
 
         // tts
         commands.put("tts", voiceCommands::ttsCommand);
+    }
 
-        return serverResources;
+    private static AudioPlayerManager setupAudioPlayerManager() {
+        final AudioPlayerManager playerManager = new DefaultAudioPlayerManager();
+        playerManager.getConfiguration().setFrameBufferFactory(NonAllocatingAudioFrameBuffer::new);
+
+        AudioSourceManagers.registerRemoteSources(playerManager);
+        AudioSourceManagers.registerLocalSource(playerManager);
+        return playerManager;
     }
 
     private Disposable registerApplicationCommands(final List<CommandRegistrar> commandRegistrars) {
@@ -270,7 +327,7 @@ public class BobJr {
         return allCommandsRegistered;
     }
 
-    public Intent extractIntent(final String incomingMessage, final MessageCreateEvent event) {
+    private Intent extractIntent(final String incomingMessage, final MessageCreateEvent event) {
         String containedBotName = checkAndReturnBotName(incomingMessage, event);
         if (containedBotName == null) {
             return null;

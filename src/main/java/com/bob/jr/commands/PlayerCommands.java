@@ -206,6 +206,22 @@ public class PlayerCommands implements CommandRegistrar {
                 .then();
     }
 
+    public Mono<Void> rickRoll(final Intent intent) {
+        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
+                .flatMap(Member::getVoiceState)
+                .flatMap(VoiceState::getChannel)
+                .doOnSuccess(connection -> serverResources.getAudioPlayerManager().loadItem("https://www.youtube.com/watch?v=dQw4w9WgXcQ", serverResources.getTrackScheduler()))
+                .then();
+    }
+
+    public Mono<Void> roll(final Intent intent) {
+        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
+                .flatMap(Member::getVoiceState)
+                .flatMap(VoiceState::getChannel)
+                .doOnSuccess(connection -> serverResources.getAudioPlayerManager().loadItem("https://www.youtube.com/watch?v=zkffTdbGI08", serverResources.getTrackScheduler()))
+                .then();
+    }
+
     public Mono<Void> playAnnouncementTrack(final Intent intent) {
         final var splitIntent = intent.intentContext().trim().split(" ");
         var trackStartTime = -1;

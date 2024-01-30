@@ -8,6 +8,7 @@ import discord4j.core.event.domain.interaction.ApplicationCommandInteractionEven
 import discord4j.core.object.VoiceState;
 import discord4j.core.object.command.ApplicationCommand;
 import discord4j.core.object.entity.Member;
+import discord4j.core.object.entity.Message;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,14 @@ public class BasicCommands implements CommandRegistrar {
 
         basicCommandMap.put(JOIN_COMMAND_HOOK, this::joinCommand);
         return commandStore.registerCommand(joinApplicationCommand);
+    }
+
+
+    public Mono<Void> pingCommand(Intent intent) {
+        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
+                .flatMap(Message::getChannel)
+                .doOnSuccess(channel -> channel.createMessage("Pong!").block())
+                .then();
     }
 
     public Disposable registerLeaveCommand() {
