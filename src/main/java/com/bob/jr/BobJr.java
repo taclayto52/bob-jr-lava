@@ -56,8 +56,6 @@ public class BobJr {
                 .then());
     }
 
-    private final HeartBeats heartBeats;
-
     public BobJr(@Nullable final String token) {
         setupHealthChecks();
 
@@ -80,7 +78,7 @@ public class BobJr {
         registerDiscordClientMemberListener(client, channelWatcher);
 
         // add heartbeats
-        heartBeats = new HeartBeats();
+        HeartBeats heartBeats = new HeartBeats();
         heartBeats.startAsync().awaitRunning();
 
         // block until disconnect
@@ -143,52 +141,39 @@ public class BobJr {
         final int indexOfAt = nickNameBuffer.indexOf("@");
         botNickName = nickNameBuffer.replace(indexOfAt, indexOfAt + 1, "@!").toString();
 
-        // get application id
-        final var applicationId = client.getApplicationInfo().block().getId();
-
-        // setup commands
-        final ServerResources serverResources = setupPlayerAndCommands(tts, client);
-
-        // setup Channel Watcher
-        final ChannelWatcher channelWatcher = new ChannelWatcher(serverResources);
-
-        // register events
-        client.getEventDispatcher().on(MessageCreateEvent.class)
-                .flatMap(this::maybeGetGuildRoles)
-                .flatMap(event -> Mono.just(event.getMessage().getContent())
-                        .filter(content -> checkAndReturnBotName(content, event) != null)
-                        .map(content -> extractIntent(content, event))
-                        .flatMap(this::handleMessageCreateEvent))
-                .subscribe();
-
-
-        // application command handlers
-        client.getEventDispatcher().on(ApplicationCommandInteractionEvent.class)
-                .flatMap(applicationCommandInteractionEvent -> {
-                    final var applicationCommand = getRegisteredCommandAction(applicationCommandInteractionEvent).orElseThrow();
-                    return applicationCommand.execute(applicationCommandInteractionEvent);
-                })
-                .subscribe();
-
-        client.getRestClient().getApplicationService().getGlobalApplicationCommands(applicationId.asLong())
-                .flatMap(applicationCommandData -> {
-                    logger.info(String.format("Got application command from global reg: %s", applicationCommandData.name()));
-                    return Mono.empty();
-                }).subscribe();
-
-        // register member listener
-        client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
-                .flatMap(channelWatcher::voiceStateUpdateEventHandler)
-                .subscribe();
-
-        // add heartbeats
-        heartBeats = new HeartBeats();
-        heartBeats.startAsync().awaitRunning();
-
-        // block until disconnect
-        client.onDisconnect().block();
-        heartBeats.stopAsync();
+        return client;
     }
+
+//        // get application id
+//        final var applicationId = client.getApplicationInfo().block().getId();
+//
+//        // application command handlers
+//        client.getEventDispatcher().on(ApplicationCommandInteractionEvent.class)
+//                .flatMap(applicationCommandInteractionEvent -> {
+//                    final var applicationCommand = getRegisteredCommandAction(applicationCommandInteractionEvent).orElseThrow();
+//                    return applicationCommand.execute(applicationCommandInteractionEvent);
+//                })
+//                .subscribe();
+//
+//        client.getRestClient().getApplicationService().getGlobalApplicationCommands(applicationId.asLong())
+//                .flatMap(applicationCommandData -> {
+//                    logger.info(String.format("Got application command from global reg: %s", applicationCommandData.name()));
+//                    return Mono.empty();
+//                }).subscribe();
+//
+//        // register member listener
+//        client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
+//                .flatMap(channelWatcher::voiceStateUpdateEventHandler)
+//                .subscribe();
+//
+//        // add heartbeats
+//        heartBeats = new HeartBeats();
+//        heartBeats.startAsync().awaitRunning();
+//
+//        // block until disconnect
+//        client.onDisconnect().block();
+//        heartBeats.stopAsync();
+//    }
 
     private static void setupHealthChecks() {
         try {
@@ -254,6 +239,15 @@ public class BobJr {
         final AudioProvider provider = new LavaPlayerAudioProvider(player, announcementPlayer);
         final ServerResources serverResources = new ServerResources(provider, scheduler, client, player, playerManager, tts, audioTrackCache);
 
+        // create application commands
+        createApplicationCommands(client);
+
+        // setup application commands
+        final CommandStore commandStore = new CommandStore(client);
+        final var basicCommands = setupBasicCommands(serverResources, commandStore);
+        final var playerCommands = setupPlayerCommands(serverResources, commandStore);
+        final var voiceCommands = setupVoiceCommands(serverResources, commandStore);
+
         registerApplicationCommands(List.of(basicCommands, playerCommands, voiceCommands));
 
         // register application commands
@@ -261,29 +255,42 @@ public class BobJr {
         applicationCommands.putAll(playerCommands.getApplicationCommandInterfaces());
         applicationCommands.putAll(voiceCommands.getApplicationCommandInterfaces());
 
-        commands.put("ping", basicCommands::pingCommand);
-
-        // setup commands
-        final CommandStore commandStore = new CommandStore(client);
-        setupBasicCommands(serverResources);
-        setupPlayerCommands(serverResources);
-        setupVoiceCommands(serverResources);
-
         return serverResources;
     }
 
-    private static void setupBasicCommands(ServerResources serverResources) {
-        final BasicCommands basicCommands = new BasicCommands(serverResources);
+    private void createApplicationCommands(GatewayDiscordClient client) {
+        // get application id
+        final var applicationId = client.getApplicationInfo().block().getId();
+
+        // application command handlers
+        client.getEventDispatcher().on(ApplicationCommandInteractionEvent.class)
+                .flatMap(applicationCommandInteractionEvent -> {
+                    final var applicationCommand = getRegisteredCommandAction(applicationCommandInteractionEvent).orElseThrow();
+                    return applicationCommand.execute(applicationCommandInteractionEvent);
+                })
+                .subscribe();
+
+        client.getRestClient().getApplicationService().getGlobalApplicationCommands(applicationId.asLong())
+                .flatMap(applicationCommandData -> {
+                    logger.info(String.format("Got application command from global reg: %s", applicationCommandData.name()));
+                    return Mono.empty();
+                }).subscribe();
+    }
+
+    private static BasicCommands setupBasicCommands(ServerResources serverResources, final CommandStore commandStore) {
+        final BasicCommands basicCommands = new BasicCommands(serverResources, commandStore);
 
         commands.put("ping", basicCommands::pingCommand);
         commands.put("join", basicCommands::joinCommand);
         commands.put("quit", basicCommands::leaveCommand);
         commands.put("leave", basicCommands::leaveCommand);
-        commands.put("stop", basicCommands::stop);
+        commands.put("stop", basicCommands::stopCommand);
+
+        return basicCommands;
     }
 
-    private static void setupPlayerCommands(ServerResources serverResources) {
-        final PlayerCommands playerCommands = new PlayerCommands(serverResources);
+    private static PlayerCommands setupPlayerCommands(ServerResources serverResources, final CommandStore commandStore) {
+        final PlayerCommands playerCommands = new PlayerCommands(serverResources, commandStore);
 
         commands.put("play", playerCommands::playCommand);
         commands.put("search", playerCommands::searchCommand);
@@ -294,11 +301,12 @@ public class BobJr {
 
         // test commands
         commands.put("play-announcement-track", playerCommands::playAnnouncementTrack);
+        return playerCommands;
     }
 
 
-    private static void setupVoiceCommands(ServerResources serverResources) {
-        final VoiceCommands voiceCommands = new VoiceCommands(serverResources);
+    private static VoiceCommands setupVoiceCommands(ServerResources serverResources, final CommandStore commandStore) {
+        final VoiceCommands voiceCommands = new VoiceCommands(serverResources, commandStore);
 
         // get voices
         commands.put("voices", voiceCommands::voicesCommand);
@@ -309,6 +317,7 @@ public class BobJr {
 
         // tts
         commands.put("tts", voiceCommands::ttsCommand);
+        return voiceCommands;
     }
 
     private static AudioPlayerManager setupAudioPlayerManager() {

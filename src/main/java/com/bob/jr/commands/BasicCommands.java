@@ -46,7 +46,7 @@ public class BasicCommands implements CommandRegistrar {
 
 
     public Mono<Void> pingCommand(Intent intent) {
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
+        return Mono.justOrEmpty(intent.messageCreateEvent().getMessage())
                 .flatMap(Message::getChannel)
                 .doOnSuccess(channel -> channel.createMessage("Pong!").block())
                 .then();
@@ -98,7 +98,7 @@ public class BasicCommands implements CommandRegistrar {
     }
 
     public Mono<Void> leaveCommandFunction(Snowflake guildSnowflake) {
-        serverResources.trackScheduler().clearPlaylist();
+        serverResources.trackScheduler().clearCurrentTrackPlaylist();
         Optional<VoiceState> voiceStateOptional = Optional.ofNullable(serverResources.gatewayClient().getMemberById(guildSnowflake, serverResources.gatewayClient().getSelfId())
                 .block()
                 .getVoiceState()
@@ -122,7 +122,7 @@ public class BasicCommands implements CommandRegistrar {
     }
 
     public void stopCommandFunction() {
-        serverResources.trackScheduler().clearPlaylist();
+        serverResources.trackScheduler().clearCurrentTrackPlaylist();
     }
 
     public Mono<Void> stopCommand(ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
