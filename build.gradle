@@ -4,7 +4,7 @@ plugins {
     id 'application'
 }
 
-project.setVersion("0.1.1")
+project.setVersion("0.2.0")
 
 repositories {   // repositories for Jar's you access in your code
     mavenCentral()
