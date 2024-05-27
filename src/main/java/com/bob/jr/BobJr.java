@@ -144,37 +144,6 @@ public class BobJr {
         return client;
     }
 
-//        // get application id
-//        final var applicationId = client.getApplicationInfo().block().getId();
-//
-//        // application command handlers
-//        client.getEventDispatcher().on(ApplicationCommandInteractionEvent.class)
-//                .flatMap(applicationCommandInteractionEvent -> {
-//                    final var applicationCommand = getRegisteredCommandAction(applicationCommandInteractionEvent).orElseThrow();
-//                    return applicationCommand.execute(applicationCommandInteractionEvent);
-//                })
-//                .subscribe();
-//
-//        client.getRestClient().getApplicationService().getGlobalApplicationCommands(applicationId.asLong())
-//                .flatMap(applicationCommandData -> {
-//                    logger.info(String.format("Got application command from global reg: %s", applicationCommandData.name()));
-//                    return Mono.empty();
-//                }).subscribe();
-//
-//        // register member listener
-//        client.getEventDispatcher().on(VoiceStateUpdateEvent.class)
-//                .flatMap(channelWatcher::voiceStateUpdateEventHandler)
-//                .subscribe();
-//
-//        // add heartbeats
-//        heartBeats = new HeartBeats();
-//        heartBeats.startAsync().awaitRunning();
-//
-//        // block until disconnect
-//        client.onDisconnect().block();
-//        heartBeats.stopAsync();
-//    }
-
     private static void setupHealthChecks() {
         try {
             new Thread(new HealthCheck(8080)).start();
