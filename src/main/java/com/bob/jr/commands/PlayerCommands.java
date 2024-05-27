@@ -19,10 +19,8 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.bob.jr.utils.ApplicationCommandUtil.*;
 import static com.bob.jr.utils.LimitsHelper.MESSAGE_LIMIT;
@@ -158,11 +156,25 @@ public class PlayerCommands implements CommandRegistrar {
     }
 
     public Mono<Void> playCommand(final ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
-        final var playCommandSourceUrl = getApplicationOptionString(applicationCommandInteractionEvent, PLAY_COMMAND_SOURCE_OPTION);
-        final var joinChannel = getApplicationOptionBoolean(applicationCommandInteractionEvent, JOIN_CHANNEL_OPTION);
+        final String playCommandSourceUrl;
+        try{
+            playCommandSourceUrl = getApplicationOptionString(applicationCommandInteractionEvent, PLAY_COMMAND_SOURCE_OPTION);
+        }
+        catch (final NoSuchElementException ignored) {
+            applicationCommandInteractionEvent.reply("❌No media link provided ❌");
+            return Mono.empty();
+        }
+        final AtomicBoolean joinChannel = new AtomicBoolean();
+        try {
+            joinChannel.set(getApplicationOptionBoolean(applicationCommandInteractionEvent, JOIN_CHANNEL_OPTION));
+        } catch (final NoSuchElementException ignored) {
+            joinChannel.set(true);
+        }
 
         return Mono.justOrEmpty(applicationCommandInteractionEvent.getInteraction().getMember().orElseThrow())
-                .flatMap(member -> playCommandFunction(member, playCommandSourceUrl, joinChannel))
+                .flatMap(member -> playCommandFunction(member, playCommandSourceUrl, joinChannel.get()))
+                .doOnSuccess(ignored -> applicationCommandInteractionEvent.reply("\uD83C\uDFB5\uD83C\uDFB5"))
+                .doOnError(throwable -> applicationCommandInteractionEvent.reply(String.format("Error: {}", throwable.getMessage())))
                 .then();
     }
 
@@ -189,10 +201,19 @@ public class PlayerCommands implements CommandRegistrar {
     }
 
     public Mono<Void> searchCommand(final ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
-        final var searchCommandTerm = getApplicationOptionString(applicationCommandInteractionEvent, SEARCH_COMMAND_TERM_OPTION);
+        final String searchCommandTerm;
+        try {
+            searchCommandTerm = getApplicationOptionString(applicationCommandInteractionEvent, SEARCH_COMMAND_TERM_OPTION);
+        } catch (NoSuchElementException noSuchElementException) {
+            applicationCommandInteractionEvent.reply("❌No search term provided ❌");
+            return Mono.empty();
+        }
+
 
         return Mono.justOrEmpty(applicationCommandInteractionEvent.getInteraction().getMember().orElseThrow())
                 .flatMap(member -> searchCommandFunction(member, searchCommandTerm, true))
+                .doOnSuccess(ignored -> applicationCommandInteractionEvent.reply("\uD83C\uDFB5\uD83C\uDFB5"))
+                .doOnError(throwable -> applicationCommandInteractionEvent.reply(String.format("Error: {}", throwable.getMessage())))
                 .then();
     }
 
