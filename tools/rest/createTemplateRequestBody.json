@@ -1,0 +1,118 @@
+{
+  "description": "",
+  "name": "bobjr-{{templateVersion}}",
+  "properties":
+  {
+    "canIpForward": false,
+    "confidentialInstanceConfig":
+    {
+      "enableConfidentialCompute": false
+    },
+    "description": "",
+    "disks":
+    [
+      {
+        "autoDelete": true,
+        "boot": true,
+        "deviceName": "persistent-disk-0",
+        "initializeParams":
+        {
+          "diskSizeGb": "10",
+          "diskType": "pd-balanced",
+          "labels": {},
+          "sourceImage": "projects/cos-cloud/global/images/cos-stable-101-17162-127-8"
+        },
+        "mode": "READ_WRITE",
+        "type": "PERSISTENT"
+      },
+      {
+        "autoDelete": false,
+        "deviceName": "persistent-disk-1",
+        "diskEncryptionKey": {},
+        "initializeParams":
+        {
+          "description": "",
+          "diskSizeGb": "10",
+          "diskType": "pd-balanced"
+        },
+        "mode": "READ_WRITE",
+        "type": "PERSISTENT"
+      }
+    ],
+    "displayDevice":
+    {
+      "enableDisplay": false
+    },
+    "keyRevocationActionType": "NONE",
+    "labels":
+    {
+      "container-vm": "cos-stable-101-17162-127-8"
+    },
+    "machineType": "e2-micro",
+    "metadata":
+    {
+      "items":
+      [
+        {
+          "key": "google-logging-enabled",
+          "value": "true"
+        },
+        {
+          "key": "gce-container-declaration",
+          "value": "spec:\n  containers:\n  - name: {{containerName}}\n    image: {{repoName}}/{{containerName}}\n    stdin: false\n    tty: false\n  restartPolicy: Always\n# This container declaration format is not public API and may change without notice. Please\n# use gcloud command-line tool or Google Cloud Console to run Containers on Google Compute Engine."
+        }
+      ]
+    },
+    "networkInterfaces":
+    [
+      {
+        "accessConfigs":
+        [
+          {
+            "kind": "compute#accessConfig",
+            "name": "External NAT",
+            "networkTier": "PREMIUM",
+            "type": "ONE_TO_ONE_NAT"
+          }
+        ],
+        "network": "projects/{{gcloudProjectName}}/global/networks/default",
+        "stackType": "IPV4_ONLY"
+      }
+    ],
+    "reservationAffinity":
+    {
+      "consumeReservationType": "ANY_RESERVATION"
+    },
+    "scheduling":
+    {
+      "automaticRestart": true,
+      "onHostMaintenance": "MIGRATE",
+      "provisioningModel": "STANDARD"
+    },
+    "serviceAccounts":
+    [
+      {
+        "email": "{{gcloudProjectName}}@appspot.gserviceaccount.com",
+        "scopes":
+        [
+          "https://www.googleapis.com/auth/cloud-platform"
+        ]
+      }
+    ],
+    "shieldedInstanceConfig":
+    {
+      "enableIntegrityMonitoring": true,
+      "enableSecureBoot": false,
+      "enableVtpm": true
+    },
+    "tags":
+    {
+      "items":
+      [
+        "http-server",
+        "https-server",
+        "lb-health-check"
+      ]
+    }
+  }
+}

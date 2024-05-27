@@ -1,0 +1,21 @@
+PATCH https://compute.googleapis.com/compute/beta/projects/vocal-pathway-313217/zones/us-east1-b/instanceGroupManagers/instance-group-1
+{
+"updatePolicy": {
+"maxSurge": {
+"fixed": 1
+},
+"maxUnavailable": {
+"fixed": 1
+},
+"minReadySec": 0,
+"minimalAction": "REPLACE",
+"replacementMethod": "SUBSTITUTE",
+"type": "PROACTIVE"
+},
+"versions": [
+{
+"instanceTemplate": "https://www.googleapis.com/compute/beta/projects/vocal-pathway-313217/global/instanceTemplates/bobjr-0-1-2",
+"name": "0-1706631523259"
+}
+]
+}

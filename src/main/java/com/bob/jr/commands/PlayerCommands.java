@@ -2,90 +2,249 @@ package com.bob.jr.commands;
 
 import com.bob.jr.Intent;
 import com.bob.jr.channelevents.ChannelWatcher;
+import com.bob.jr.interfaces.ApplicationCommandInterface;
 import com.bob.jr.utils.ServerResources;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import discord4j.core.event.domain.interaction.ApplicationCommandInteractionEvent;
 import discord4j.core.object.VoiceState;
+import discord4j.core.object.command.ApplicationCommand;
+import discord4j.core.object.command.ApplicationCommandOption;
 import discord4j.core.object.entity.Member;
-import discord4j.core.object.entity.Message;
+import discord4j.core.object.entity.channel.MessageChannel;
+import discord4j.discordjson.json.ApplicationCommandOptionData;
+import discord4j.discordjson.json.ApplicationCommandRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.Disposable;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import static com.bob.jr.utils.ApplicationCommandUtil.*;
 import static com.bob.jr.utils.LimitsHelper.MESSAGE_LIMIT;
 import static com.bob.jr.utils.LimitsHelper.PLAYLIST_RETURN_LIMIT;
 
-public class PlayerCommands {
+public class PlayerCommands implements CommandRegistrar {
 
     private final ServerResources serverResources;
+    private final CommandStore commandStore;
+    private final Map<String, ApplicationCommandInterface> playerCommandMap = new HashMap<>();
+    private final String PLAY_COMMAND_HOOK = "play";
+    private final String SEARCH_COMMAND_HOOK = "search";
+    private final String PLAYLIST_COMMAND_HOOK = "playlist";
+    private final String VOLUME_COMMAND_HOOK = "volume";
+
+    private final String PLAY_COMMAND_SOURCE_OPTION = "audio_source";
+    private final String SEARCH_COMMAND_TERM_OPTION = "search_term";
+    private final String JOIN_CHANNEL_OPTION = "join_channel";
+    private final String SET_VOLUME_OPTION = "set_volume";
     private final Logger logger = LoggerFactory.getLogger(PlayerCommands.class.getName());
 
-    public PlayerCommands(final ServerResources serverResources) {
+    private final ApplicationCommandOptionData joinChannelOption = ApplicationCommandOptionData.builder()
+            .name(JOIN_CHANNEL_OPTION)
+            .description("Have the bot join your channel?")
+            .type(ApplicationCommandOption.Type.BOOLEAN.getValue())
+            .required(false)
+            .build();
+
+    private final ApplicationCommandOptionData setVolumeOption = ApplicationCommandOptionData.builder()
+            .name(SET_VOLUME_OPTION)
+            .description("Set the bot volume.")
+            .type(ApplicationCommandOption.Type.INTEGER.getValue())
+            .required(false)
+            .build();
+
+    public PlayerCommands(final ServerResources serverResources, final CommandStore commandStore) {
         this.serverResources = serverResources;
+        this.commandStore = commandStore;
     }
 
-    public Mono<Void> setVolume(final Intent intent) {
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
-                .flatMap(Message::getChannel)
-                .doOnSuccess(messageChannel -> {
-                    var volume = -1; // -1 to indicate never set
-                    final String intentContext = intent.getIntentContext();
-                    if (intentContext != null) {
-                        volume = Integer.parseInt(intentContext.split(" ")[0]);
-                    }
+    public Disposable registerPlayCommand() {
+        final var playCommandOption = ApplicationCommandOptionData.builder()
+                .name(PLAY_COMMAND_SOURCE_OPTION)
+                .description("URL to audio source")
+                .type(ApplicationCommandOption.Type.STRING.getValue())
+                .required(true)
+                .build();
 
+        final ApplicationCommandRequest playApplicationCommand = ApplicationCommandRequest.builder()
+                .name(PLAY_COMMAND_HOOK)
+                .type(ApplicationCommand.Type.CHAT_INPUT.getValue())
+                .description("Play an audio source")
+                .addAllOptions(List.of(playCommandOption, joinChannelOption))
+                .build();
 
-                    if (volume != -1) {
-                        serverResources.getAudioPlayer().setVolume(volume);
-                    } else {
-                        volume = serverResources.getAudioPlayer().getVolume();
-                    }
-                    messageChannel.createMessage(String.format("Volume set at %s", volume)).block();
-                })
+        playerCommandMap.put(PLAY_COMMAND_HOOK, this::playCommand);
+        return commandStore.registerCommand(playApplicationCommand);
+    }
+
+    public Disposable registerSearchCommand() {
+        final var searchCommandOption = ApplicationCommandOptionData.builder()
+                .name(SEARCH_COMMAND_TERM_OPTION)
+                .description("Term to search for")
+                .type(ApplicationCommandOption.Type.STRING.getValue())
+                .required(true)
+                .build();
+        final ApplicationCommandRequest searchApplicationCommand = ApplicationCommandRequest.builder()
+                .name(SEARCH_COMMAND_HOOK)
+                .type(ApplicationCommand.Type.CHAT_INPUT.getValue())
+                .description("Search all sources (YouTube, etc) for audio")
+                .addAllOptions(List.of(searchCommandOption, joinChannelOption))
+                .build();
+
+        playerCommandMap.put(SEARCH_COMMAND_HOOK, this::searchCommand);
+        return commandStore.registerCommand(searchApplicationCommand);
+    }
+
+    public Disposable registerPlaylistCommand() {
+        final ApplicationCommandRequest playlistApplicationCommand = ApplicationCommandRequest.builder()
+                .name(PLAYLIST_COMMAND_HOOK)
+                .type(ApplicationCommand.Type.CHAT_INPUT.getValue())
+                .description("Get the current playlist.")
+                .build();
+
+        playerCommandMap.put(PLAYLIST_COMMAND_HOOK, this::playlistCommand);
+        return commandStore.registerCommand(playlistApplicationCommand);
+    }
+
+    public Disposable registerVolumeCommand() {
+        final ApplicationCommandRequest volumeApplicationCommand = ApplicationCommandRequest.builder()
+                .name(VOLUME_COMMAND_HOOK)
+                .type(ApplicationCommand.Type.CHAT_INPUT.getValue())
+                .description("Get (or set) the bot volume.")
+                .addAllOptions(List.of(setVolumeOption))
+                .build();
+
+        playerCommandMap.put(VOLUME_COMMAND_HOOK, this::volumeCommand);
+        return commandStore.registerCommand(volumeApplicationCommand);
+    }
+
+    public Mono<Void> volumeCommand(final Intent intent) {
+        final var volumeString = intent.intentContext();
+        final var channel = intent.messageCreateEvent().getMessage().getChannel().block();
+
+        var volume = -1;
+        if (volumeString != null) {
+            volume = Integer.parseInt(volumeString.split(" ")[0]);
+        }
+
+        return volumeFunction(channel, volume);
+    }
+
+    public Mono<Void> volumeCommand(final ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
+        final var volume = getApplicationOptionLong(applicationCommandInteractionEvent, SET_VOLUME_OPTION);
+        final var channel = applicationCommandInteractionEvent.getInteraction().getChannel().block();
+
+        return volumeFunction(channel, (int) volume);
+    }
+
+    public Mono<Void> volumeFunction(MessageChannel messageChannel, int volume) {
+        if (volume != -1) {
+            serverResources.audioPlayer().setVolume(volume);
+        } else {
+            volume = serverResources.audioPlayer().getVolume();
+        }
+        return messageChannel.createMessage(String.format("Volume set at %s", volume)).then();
+    }
+
+    public Mono<Void> playCommand(final Intent intent) {
+        return Mono.justOrEmpty(intent.messageCreateEvent().getMember())
+                .flatMap(member -> playCommandFunction(member, intent, true))
                 .then();
     }
 
-    public Mono<Void> play(final Intent intent) {
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
-                .flatMap(Member::getVoiceState)
-                .flatMap(VoiceState::getChannel)
-                .flatMap(channel -> channel.join(spec -> spec.setProvider(serverResources.getServerAudioProvider())))
+    public Mono<Void> playCommand(final ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
+        final String playCommandSourceUrl;
+        try{
+            playCommandSourceUrl = getApplicationOptionString(applicationCommandInteractionEvent, PLAY_COMMAND_SOURCE_OPTION);
+        }
+        catch (final NoSuchElementException ignored) {
+            applicationCommandInteractionEvent.reply("❌No media link provided ❌");
+            return Mono.empty();
+        }
+        final AtomicBoolean joinChannel = new AtomicBoolean();
+        try {
+            joinChannel.set(getApplicationOptionBoolean(applicationCommandInteractionEvent, JOIN_CHANNEL_OPTION));
+        } catch (final NoSuchElementException ignored) {
+            joinChannel.set(true);
+        }
+
+        return Mono.justOrEmpty(applicationCommandInteractionEvent.getInteraction().getMember().orElseThrow())
+                .flatMap(member -> playCommandFunction(member, playCommandSourceUrl, joinChannel.get()))
+                .doOnSuccess(ignored -> applicationCommandInteractionEvent.reply("\uD83C\uDFB5\uD83C\uDFB5"))
+                .doOnError(throwable -> applicationCommandInteractionEvent.reply(String.format("Error: {}", throwable.getMessage())))
+                .then();
+    }
+
+    public Mono<Void> playCommandFunction(final Member member, final Intent intent, final boolean joinChannel) {
+        return playCommandFunction(member, intent.intentContext(), joinChannel);
+    }
+
+    public Mono<Void> playCommandFunction(final Member member, final String sourceUrl, final boolean joinChannel) {
+        final var prePlayMono = joinChannel ?
+                member.getVoiceState().flatMap(VoiceState::getChannel).flatMap(serverResources::joinVoiceChannel) :
+                Mono.empty();
+        return prePlayMono
                 .doOnSuccess(voided -> {
-                    final var context = checkAndHandleFile(intent.getIntentContext());
-                    serverResources.getAudioPlayerManager().loadItem(context, serverResources.getTrackScheduler());
+                    final var resourceLocation = checkAndHandleFile(sourceUrl);
+                    serverResources.audioPlayerManager().loadItem(resourceLocation, serverResources.trackScheduler());
                 })
                 .then();
     }
 
-    public Mono<Void> search(final Intent intent) {
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
-                .flatMap(Member::getVoiceState)
-                .flatMap(VoiceState::getChannel)
-                .flatMap(channel -> channel.join(spec -> spec.setProvider(serverResources.getServerAudioProvider())))
-                .doOnSuccess(voided -> serverResources.getAudioPlayerManager().loadItem(String.format("ytsearch:%s", intent.getIntentContext()), serverResources.getTrackScheduler()))
+    public Mono<Void> searchCommand(final Intent intent) {
+        return Mono.justOrEmpty(intent.messageCreateEvent().getMember())
+                .flatMap(member -> searchCommandFunction(member, intent.intentContext(), true))
+                .then();
+    }
+
+    public Mono<Void> searchCommand(final ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
+        final String searchCommandTerm;
+        try {
+            searchCommandTerm = getApplicationOptionString(applicationCommandInteractionEvent, SEARCH_COMMAND_TERM_OPTION);
+        } catch (NoSuchElementException noSuchElementException) {
+            applicationCommandInteractionEvent.reply("❌No search term provided ❌");
+            return Mono.empty();
+        }
+
+
+        return Mono.justOrEmpty(applicationCommandInteractionEvent.getInteraction().getMember().orElseThrow())
+                .flatMap(member -> searchCommandFunction(member, searchCommandTerm, true))
+                .doOnSuccess(ignored -> applicationCommandInteractionEvent.reply("\uD83C\uDFB5\uD83C\uDFB5"))
+                .doOnError(throwable -> applicationCommandInteractionEvent.reply(String.format("Error: {}", throwable.getMessage())))
+                .then();
+    }
+
+    public Mono<Void> searchCommandFunction(final Member member, final String searchTerm, final boolean joinChannel) {
+        final var preSearchMono = joinChannel ?
+                member.getVoiceState().flatMap(VoiceState::getChannel).flatMap(serverResources::joinVoiceChannel) :
+                Mono.empty();
+
+        return preSearchMono
+                .doOnSuccess(voided -> serverResources.audioPlayerManager().loadItem(String.format("ytsearch:%s", searchTerm), serverResources.trackScheduler()))
                 .then();
     }
 
     public Mono<Void> rickRoll(final Intent intent) {
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
+        return Mono.justOrEmpty(intent.messageCreateEvent().getMember())
                 .flatMap(Member::getVoiceState)
                 .flatMap(VoiceState::getChannel)
-                .doOnSuccess(connection -> serverResources.getAudioPlayerManager().loadItem("https://www.youtube.com/watch?v=dQw4w9WgXcQ", serverResources.getTrackScheduler()))
+                .doOnSuccess(connection -> serverResources.audioPlayerManager().loadItem("https://www.youtube.com/watch?v=dQw4w9WgXcQ", serverResources.trackScheduler()))
                 .then();
     }
 
     public Mono<Void> roll(final Intent intent) {
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMember())
+        return Mono.justOrEmpty(intent.messageCreateEvent().getMember())
                 .flatMap(Member::getVoiceState)
                 .flatMap(VoiceState::getChannel)
-                .doOnSuccess(connection -> serverResources.getAudioPlayerManager().loadItem("https://www.youtube.com/watch?v=zkffTdbGI08", serverResources.getTrackScheduler()))
+                .doOnSuccess(connection -> serverResources.audioPlayerManager().loadItem("https://www.youtube.com/watch?v=zkffTdbGI08", serverResources.trackScheduler()))
                 .then();
     }
 
     public Mono<Void> playAnnouncementTrack(final Intent intent) {
-        final var splitIntent = intent.getIntentContext().trim().split(" ");
+        final var splitIntent = intent.intentContext().trim().split(" ");
         var trackStartTime = -1;
         if (splitIntent.length == 2) {
             try {
@@ -99,34 +258,48 @@ public class PlayerCommands {
         return Mono.empty();
     }
 
-    public Mono<Void> playlist(final Intent intent) {
-        final var scheduler = serverResources.getTrackScheduler();
-        final var player = serverResources.getAudioPlayer();
-        return Mono.justOrEmpty(intent.getMessageCreateEvent().getMessage())
-                .flatMap(Message::getChannel)
-                .flatMap(messageChannel -> {
-                    final List<AudioTrack> audioTrackList = scheduler.getAudioTracks();
-                    final StringBuilder printString = new StringBuilder();
-                    if (audioTrackList.isEmpty() && Optional.ofNullable(player.getPlayingTrack()).isEmpty()) {
-                        printString.append(":no_mouth: No playlist currently set");
-                    } else {
-                        if (Optional.ofNullable(player.getPlayingTrack()).isPresent()) {
-                            printString.append(String.format(":loud_sound: **Currently playing:** %s%n", player.getPlayingTrack().getInfo().title));
-                        }
-                        for (int i = 0; i < audioTrackList.size(); i++) {
-                            final String appendString = String.format("%d: %s%n", i + 1, audioTrackList.get(i).getInfo().title);
-                            if (printString.length() + appendString.length() + 20 >= MESSAGE_LIMIT
-                                    || i == PLAYLIST_RETURN_LIMIT) {
-                                printString.append(String.format("And %d more...", audioTrackList.size() - i));
-                                break;
-                            }
-                            printString.append(appendString);
-                        }
-                    }
-
-                    return messageChannel.createMessage(printString.toString());
-                })
+    public Mono<Void> playlistCommand(final ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
+        final var messageChannel = applicationCommandInteractionEvent.getInteraction().getChannel().block();
+        return Mono.just(playlistCommandFunction(messageChannel))
+                .flatMap(applicationCommandInteractionEvent::reply)
                 .then();
+    }
+
+    public Mono<Void> playlistCommand(final Intent intent) {
+        final var messageChannel = intent.messageCreateEvent().getMessage().getChannel().block();
+        return Mono.just(playlistCommandFunction(messageChannel))
+                .flatMap(messageChannel::createMessage)
+                .then();
+    }
+
+    public String playlistCommandFunction(final MessageChannel messageChannel) {
+        final var scheduler = serverResources.trackScheduler();
+        final var player = serverResources.audioPlayer();
+
+        final List<AudioTrack> audioTrackList = scheduler.getAudioTracks();
+        final StringBuilder printString = new StringBuilder();
+        if (audioTrackList.isEmpty() && Optional.ofNullable(player.getPlayingTrack()).isEmpty()) {
+            printString.append(":no_mouth: No playlist currently set");
+        } else {
+            if (Optional.ofNullable(player.getPlayingTrack()).isPresent()) {
+                printString.append(String.format(":loud_sound: **Currently playing:** %s%n", player.getPlayingTrack().getInfo().title));
+            }
+            for (int i = 0; i < audioTrackList.size(); i++) {
+                final String appendString = String.format("%d: %s%n", i + 1, audioTrackList.get(i).getInfo().title);
+                if (printString.length() + appendString.length() + 20 >= MESSAGE_LIMIT
+                        || i == PLAYLIST_RETURN_LIMIT) {
+                    printString.append(String.format("And %d more...", audioTrackList.size() - i));
+                    break;
+                }
+                printString.append(appendString);
+            }
+        }
+
+        return printString.toString();
+    }
+
+    public Map<String, ApplicationCommandInterface> getApplicationCommandInterfaces() {
+        return playerCommandMap;
     }
 
 
@@ -138,5 +311,12 @@ public class PlayerCommands {
         }
 
         return resourceLocation;
+    }
+
+    @Override
+    public Disposable registerCommands() {
+        return Flux.fromIterable(List.of(registerPlaylistCommand(), registerPlayCommand(), registerSearchCommand(), registerVolumeCommand()))
+                .doOnComplete(() -> logger.info("Finished registering {}", PlayerCommands.class.getName()))
+                .blockLast();
     }
 }
