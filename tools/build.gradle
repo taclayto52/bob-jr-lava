@@ -5,6 +5,9 @@ plugins {
 
 repositories {   // repositories for Jar's you access in your code
     mavenCentral()
+    maven{
+        url = "https://maven.lavalink.dev/snapshots"
+    }
     maven {
         url 'https://m2.dv8tion.net/releases'
     }
