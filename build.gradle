@@ -49,15 +49,15 @@ tasks.create('dockerPublish').dependsOn(dockerBuild).doLast({
 dependencies {
     implementation platform('com.google.cloud:libraries-bom:20.9.0')
     implementation group: 'com.google.guava', name: 'guava', version: '31.0.1-jre'
-    implementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
-    implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: '1.7.32'
+    implementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.5.6'
+    implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: '1.7.36'
     implementation group: 'net.logstash.logback', name: 'logstash-logback-encoder', version: '6.6'
     implementation group: 'com.discord4j', name: 'discord4j-core', version: '3.2.6'
     implementation group: 'dev.arbjerg', name: 'lavaplayer', version: '2.1.2'
     implementation group: 'dev.lavalink.youtube', name: 'common', version: '15f1efa35c306bfaa658e351ac48038b40d6da7b-SNAPSHOT'
     implementation group: 'dev.arbjerg', name: 'lavaplayer-natives', version: '2.0.0'
     implementation group: 'com.google.cloud', name: 'google-cloud-texttospeech', version: '1.4.1'
-    implementation 'com.google.cloud:google-cloud-logging-logback:0.123.4-alpha'
+    implementation 'com.google.cloud:google-cloud-logging-logback:0.131.9-alpha'
 
     implementation 'com.google.cloud:google-cloud-secretmanager'
 
