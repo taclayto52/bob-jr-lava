@@ -57,8 +57,12 @@ public class BobJr {
                 .then());
     }
 
-    public BobJr(@Nullable final String token) {
+    public BobJr(@Nullable final String argToken) {
         setupHealthChecks();
+
+        // resolve either env arg or program arg
+        final var discordTokenEnv = System.getenv("DISCORD_TOKEN");
+        final var token =  discordTokenEnv != null ? discordTokenEnv : argToken;
 
         // setup GCloud text to speech
         final TextToSpeech tts = setupTextToSpeech();

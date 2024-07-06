@@ -85,6 +85,7 @@ public class BasicCommands implements CommandRegistrar {
 
     // since the operations are functionally the same after we get the member, we should generalize that
     public Mono<Void> joinCommand(ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
+        logger.info("received join command");
         return Mono.justOrEmpty(applicationCommandInteractionEvent.getInteraction().getMember().orElseThrow())
                 .flatMap(this::joinCommandFunction)
                 .then(applicationCommandInteractionEvent.reply("joining the channel!"))
