@@ -9,7 +9,7 @@ repositories {   // repositories for Jar's you access in your code
         url = "https://maven.lavalink.dev/snapshots"
     }
     maven {
-        url 'https://m2.dv8tion.net/releases'
+        url = "https://maven.lavalink.dev/releases"
     }
     maven {
         url 'https://jitpack.io'

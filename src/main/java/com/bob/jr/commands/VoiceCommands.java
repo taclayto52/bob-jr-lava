@@ -267,7 +267,8 @@ public class VoiceCommands implements CommandRegistrar {
     public Mono<Void> ttsCommand(ApplicationCommandInteractionEvent applicationCommandInteractionEvent) {
         final var member = applicationCommandInteractionEvent.getInteraction().getMember().orElseThrow();
 
-        return ttsFunction(member, getApplicationOptionString(applicationCommandInteractionEvent, TTS_COMMAND_TEXT_OPTION), true);
+        return ttsFunction(member, getApplicationOptionString(applicationCommandInteractionEvent, TTS_COMMAND_TEXT_OPTION), true)
+                .then(applicationCommandInteractionEvent.reply("Playing TTS"));
     }
 
     public Mono<Void> ttsFunction(Member member, String tts, boolean joinChannel) {

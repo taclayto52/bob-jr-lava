@@ -173,8 +173,8 @@ public class PlayerCommands implements CommandRegistrar {
 
         return Mono.justOrEmpty(applicationCommandInteractionEvent.getInteraction().getMember().orElseThrow())
                 .flatMap(member -> playCommandFunction(member, playCommandSourceUrl, joinChannel.get()))
-                .doOnSuccess(ignored -> applicationCommandInteractionEvent.reply("\uD83C\uDFB5\uD83C\uDFB5"))
-                .doOnError(throwable -> applicationCommandInteractionEvent.reply(String.format("Error: {}", throwable.getMessage())))
+                .then(applicationCommandInteractionEvent.reply("\uD83C\uDFB5\uD83C\uDFB5"))
+                .doOnError(throwable -> applicationCommandInteractionEvent.reply(String.format("Error: %s", throwable.getMessage())))
                 .then();
     }
 
@@ -212,7 +212,7 @@ public class PlayerCommands implements CommandRegistrar {
 
         return Mono.justOrEmpty(applicationCommandInteractionEvent.getInteraction().getMember().orElseThrow())
                 .flatMap(member -> searchCommandFunction(member, searchCommandTerm, true))
-                .doOnSuccess(ignored -> applicationCommandInteractionEvent.reply("\uD83C\uDFB5\uD83C\uDFB5"))
+                .then(applicationCommandInteractionEvent.reply("\uD83C\uDFB5\uD83C\uDFB5"))
                 .doOnError(throwable -> applicationCommandInteractionEvent.reply(String.format("Error: {}", throwable.getMessage())))
                 .then();
     }
