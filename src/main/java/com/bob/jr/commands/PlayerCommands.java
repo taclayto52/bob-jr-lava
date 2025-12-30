@@ -11,6 +11,7 @@ import discord4j.core.object.command.ApplicationCommand;
 import discord4j.core.object.command.ApplicationCommandOption;
 import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.channel.MessageChannel;
+import discord4j.core.object.entity.channel.VoiceChannel;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import org.slf4j.Logger;
@@ -184,7 +185,9 @@ public class PlayerCommands implements CommandRegistrar {
 
     public Mono<Void> playCommandFunction(final Member member, final String sourceUrl, final boolean joinChannel) {
         final var prePlayMono = joinChannel ?
-                member.getVoiceState().flatMap(VoiceState::getChannel).flatMap(serverResources::joinVoiceChannel) :
+                member.getVoiceState().flatMap(VoiceState::getChannel)
+                        .cast(VoiceChannel.class)
+                        .flatMap(serverResources::joinVoiceChannel) :
                 Mono.empty();
         return prePlayMono
                 .doOnSuccess(voided -> {
@@ -219,7 +222,9 @@ public class PlayerCommands implements CommandRegistrar {
 
     public Mono<Void> searchCommandFunction(final Member member, final String searchTerm, final boolean joinChannel) {
         final var preSearchMono = joinChannel ?
-                member.getVoiceState().flatMap(VoiceState::getChannel).flatMap(serverResources::joinVoiceChannel) :
+                member.getVoiceState().flatMap(VoiceState::getChannel)
+                        .cast(VoiceChannel.class)
+                        .flatMap(serverResources::joinVoiceChannel) :
                 Mono.empty();
 
         return preSearchMono

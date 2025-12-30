@@ -15,8 +15,8 @@ import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers;
-import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager;
 import com.sedmelluq.discord.lavaplayer.track.playback.NonAllocatingAudioFrameBuffer;
+import dev.lavalink.youtube.YoutubeAudioSourceManager;
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.VoiceStateUpdateEvent;
@@ -138,6 +138,7 @@ public class BobJr {
 
         logger.info("client logging in...");
         final GatewayDiscordClient client = DiscordClientBuilder.create(tokenProvided).build()
+                .gateway()
                 .login()
                 .block();
         logger.info("client logged in!");
@@ -299,7 +300,7 @@ public class BobJr {
         playerManager.getConfiguration().setFrameBufferFactory(NonAllocatingAudioFrameBuffer::new);
 
         // register youtube plugin
-        final var youtubeSourceManager = new dev.lavalink.youtube.YoutubeAudioSourceManager();
+        final var youtubeSourceManager = new YoutubeAudioSourceManager();
         playerManager.registerSourceManager(youtubeSourceManager);
 
         // excluding the built-in youtube audio source manager as it is deprecated

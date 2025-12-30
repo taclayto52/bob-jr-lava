@@ -6,7 +6,7 @@ import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.object.entity.channel.VoiceChannel;
-import discord4j.core.spec.VoiceChannelJoinSpec;
+import discord4j.core.spec.AudioChannelJoinSpec;
 import discord4j.voice.AudioProvider;
 import discord4j.voice.VoiceConnection;
 import reactor.core.publisher.Mono;
@@ -30,7 +30,10 @@ public record ServerResources(AudioProvider serverAudioProvider,
         return voiceChannel.join(createVoiceChannelJoinSpec());
     }
 
-    public VoiceChannelJoinSpec createVoiceChannelJoinSpec() {
-        return VoiceChannelJoinSpec.builder().provider(serverAudioProvider()).build();
+    public AudioChannelJoinSpec createVoiceChannelJoinSpec() {
+        return AudioChannelJoinSpec.builder()
+                .provider(serverAudioProvider())
+                .selfDeaf(true)
+                .build();
     }
 }

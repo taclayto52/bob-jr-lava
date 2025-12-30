@@ -6,6 +6,9 @@ COPY build/libs/bob-jr-lava-${PROJECT_VERSION}-all.jar /opt/bob-jr/bob-jr-lava-a
 COPY build/resources/main/soundFiles/readme.txt build/resources/main/soundFiles/*.webm build/resources/main/soundFiles/*.opus /opt/bob-jr/soundFiles/
 COPY build/resources/main/soundFiles/percussion/readme.txt build/resources/main/soundFiles/percussion/*.mp3
 
+ADD google-auth.json /opt/bob-jr/google-auth.json
+ENV GOOGLE_APPLICATION_CREDENTIALS="/opt/bob-jr/google-auth.json"
+
 # install openJDK 14
 RUN apt-get update
 RUN apt-get install -y wget apt-transport-https gnupg curl

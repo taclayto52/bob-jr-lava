@@ -9,6 +9,7 @@ import discord4j.core.object.VoiceState;
 import discord4j.core.object.command.ApplicationCommand;
 import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.Message;
+import discord4j.core.object.entity.channel.VoiceChannel;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,6 +80,7 @@ public class BasicCommands implements CommandRegistrar {
     public Mono<Void> joinCommandFunction(Member member) {
         return member.getVoiceState()
                 .flatMap(VoiceState::getChannel)
+                .cast(VoiceChannel.class)
                 .flatMap(serverResources::joinVoiceChannel)
                 .then();
     }
