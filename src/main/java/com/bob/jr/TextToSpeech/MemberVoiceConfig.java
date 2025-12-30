@@ -43,24 +43,23 @@ public class MemberVoiceConfig {
         Optional<String> genderOptional = Optional.ofNullable(gender);
 
         genderOptional.ifPresent(genderPres -> {
-            SsmlVoiceGender ssmlVoiceGender;
-            switch (genderPres.toLowerCase(Locale.ENGLISH)) {
-                case "male": ssmlVoiceGender = SsmlVoiceGender.MALE; break;
-                case "female": ssmlVoiceGender = SsmlVoiceGender.FEMALE; break;
-                default: ssmlVoiceGender = SsmlVoiceGender.NEUTRAL; break;
-            }
+            SsmlVoiceGender ssmlVoiceGender = switch (genderPres.toLowerCase(Locale.ENGLISH)) {
+                case "male" -> SsmlVoiceGender.MALE;
+                case "female" -> SsmlVoiceGender.FEMALE;
+                default -> SsmlVoiceGender.NEUTRAL;
+            };
             voiceSelectionParamsBuilder.setSsmlGender(ssmlVoiceGender);
         });
     }
 
     public void setVoiceNameInVoiceSelectionParams(String voiceName) {
         Optional<String> voiceNameOptional = Optional.ofNullable(voiceName);
-        voiceNameOptional.ifPresent(voiceNamePres -> voiceSelectionParamsBuilder.setName(voiceNamePres));
+        voiceNameOptional.ifPresent(voiceSelectionParamsBuilder::setName);
     }
 
     public void setPitchInAudioConfigBuilder(Double pitch) {
         Optional<Double> pitchOptional = Optional.ofNullable(pitch);
-        pitchOptional.ifPresent(pitchPres -> audioConfigBuilder.setPitch(pitchPres));
+        pitchOptional.ifPresent(audioConfigBuilder::setPitch);
     }
 
     public void setSpeakingRateInAudioConfigBuilder(Double speakingRate) {

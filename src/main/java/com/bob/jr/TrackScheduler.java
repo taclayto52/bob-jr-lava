@@ -65,22 +65,6 @@ public class TrackScheduler implements AudioLoadResultHandler {
         }
     }
 
-    private TrackMarker getTrackMarker(long setEndTime, AnnouncementTrack announcementTrack) {
-        final TrackMarker trackMarker = new TrackMarker(setEndTime, (markerState) -> {
-            if (markerState == TrackMarkerHandler.MarkerState.REACHED) {
-                logger.debug("Marker has been reached");
-            } else if (markerState == TrackMarkerHandler.MarkerState.ENDED) {
-                logger.debug("Marker has ended");
-            } else {
-                logger.debug(String.format("reached unknown marker state: %s", markerState));
-            }
-            announcementTracks.remove(announcementTrack.getTrackUrl());
-            announcementTrackPlayer.stopTrack();
-            setDefaultTrackPlayerAsActive();
-        });
-        return trackMarker;
-    }
-
     private static long getTrackEndTime(AudioTrack track, AnnouncementTrack announcementTrack) {
         track.setPosition(Math.round(announcementTrack.getStartTime() * 1000));
         final long setEndTime;
@@ -99,6 +83,22 @@ public class TrackScheduler implements AudioLoadResultHandler {
         return announcementTrackKey;
     }
 
+    private TrackMarker getTrackMarker(long setEndTime, AnnouncementTrack announcementTrack) {
+        final TrackMarker trackMarker = new TrackMarker(setEndTime, (markerState) -> {
+            if (markerState == TrackMarkerHandler.MarkerState.REACHED) {
+                logger.debug("Marker has been reached");
+            } else if (markerState == TrackMarkerHandler.MarkerState.ENDED) {
+                logger.debug("Marker has ended");
+            } else {
+                logger.debug(String.format("reached unknown marker state: %s", markerState));
+            }
+            announcementTracks.remove(announcementTrack.getTrackUrl());
+            announcementTrackPlayer.stopTrack();
+            setDefaultTrackPlayerAsActive();
+        });
+        return trackMarker;
+    }
+
     private void playTrackWithDefaultTrackPlayer(AudioTrack track) {
         setDefaultTrackPlayerAsActive();
         defaultTrackPlayer.stopTrack();
@@ -106,7 +106,7 @@ public class TrackScheduler implements AudioLoadResultHandler {
     }
 
     private void updateTrackCache(final AudioTrack track) {
-        if (audioTrackCache != null && !audioTrackCache.checkIfTrackIsPresent(track.getInfo().uri)) {
+        if (audioTrackCache != null && audioTrackCache.checkIfTrackIsPresent(track.getInfo().uri)) {
             audioTrackCache.addTrackToCache(track.getInfo().uri, track);
         }
     }

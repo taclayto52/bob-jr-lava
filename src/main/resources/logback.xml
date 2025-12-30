@@ -1,6 +1,8 @@
 <configuration scan="true">
     <logger name="io.netty" level="INFO"/>
     <logger name="reactor" level="INFO"/>
+    <logger name="discord4j.voice.LocalVoiceReceiveTask" level="OFF"/>
+    <logger name="discord4j.voice.PacketTransformer" level="OFF"/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>

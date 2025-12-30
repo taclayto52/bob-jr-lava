@@ -13,6 +13,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Build the Docker image
-      run: ./gradlew dockerBuild --no-daemon
+      - uses: actions/checkout@v2
+      - name: Build the Docker image
+        run: gradle dockerBuild --no-daemon
