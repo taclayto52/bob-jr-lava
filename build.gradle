@@ -1,5 +1,5 @@
 plugins {
-    id 'com.github.johnrengelman.shadow' version '7.0.0'
+    id 'com.gradleup.shadow' version '9.3.0'
     id 'java'
     id 'application'
     id 'com.github.ben-manes.versions' version '0.53.0'
@@ -32,25 +32,28 @@ application {
     mainClass = 'com.bob.jr.BobJr'
 }
 
-tasks.create('dockerBuild').dependsOn(shadowJar).doLast({
-    exec {
-        executable 'docker'
-        args 'build', '--build-arg', 'PROJECT_VERSION=' + project.getVersion(),
-                '-t', 'us-central1-docker.pkg.dev/vocal-pathway-313217/private-docker-repo/bob-jr-lava:' + project.getVersion(),
-                '-t', 'us-central1-docker.pkg.dev/vocal-pathway-313217/private-docker-repo/bob-jr-lava:latest', '.'
-    }
-})
 
-tasks.create('dockerPublish').dependsOn(dockerBuild).doLast({
-    exec {
-        executable 'docker'
-        args 'image', 'push', 'us-central1-docker.pkg.dev/vocal-pathway-313217/private-docker-repo/bob-jr-lava:' + project.getVersion()
-    }
-    exec {
-        executable 'docker'
-        args 'image', 'push', 'us-central1-docker.pkg.dev/vocal-pathway-313217/private-docker-repo/bob-jr-lava:latest'
-    }
-})
+tasks.register('dockerBuild', Exec) {
+    dependsOn(shadowJar)
+    commandLine 'docker', 'build',
+            '--build-arg', "PROJECT_VERSION=${project.version}",
+            '-t', "us-central1-docker.pkg.dev/vocal-pathway-313217/private-docker-repo/bob-jr-lava:${project.version}",
+            '-t', 'us-central1-docker.pkg.dev/vocal-pathway-313217/private-docker-repo/bob-jr-lava:latest',
+            '.'
+}
+
+tasks.register('dockerPublish', Exec) {
+    dependsOn('dockerBuild')
+    commandLine 'docker', 'image', 'push',
+            "us-central1-docker.pkg.dev/vocal-pathway-313217/private-docker-repo/bob-jr-lava:${project.version}"
+}
+
+tasks.register('dockerPublishLatest', Exec) {
+    dependsOn('dockerBuild')
+    commandLine 'docker', 'image', 'push',
+            'us-central1-docker.pkg.dev/vocal-pathway-313217/private-docker-repo/bob-jr-lava:latest'
+}
+
 
 dependencies {
     implementation platform('com.google.cloud:libraries-bom:20.9.0')
@@ -68,8 +71,9 @@ dependencies {
     implementation 'com.google.cloud:google-cloud-secretmanager'
 
 // Add your dependencies here.
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
 }
 
 shadowJar {
